@@ -1,1 +1,0 @@
-/home/mohamed/attend/bin/src/CMakeFiles/DisplayImage.dir
