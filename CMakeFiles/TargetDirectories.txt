@@ -1,0 +1,3 @@
+/home/mohamed/code/attend/CMakeFiles/edit_cache.dir
+/home/mohamed/code/attend/CMakeFiles/rebuild_cache.dir
+/home/mohamed/code/attend/CMakeFiles/DisplayImage.dir
