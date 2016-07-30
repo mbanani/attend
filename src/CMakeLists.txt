@@ -3,5 +3,5 @@ project( DisplayImage_exe )
 
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
-add_executable( DisplayImage DisplayImage.cpp )
-target_link_libraries( DisplayImage ${OpenCV_LIBS} )
+add_executable( itti itti_model.cpp )
+target_link_libraries( itti ${OpenCV_LIBS} )
