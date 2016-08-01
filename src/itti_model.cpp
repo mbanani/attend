@@ -19,6 +19,9 @@
 *
 */
 
+// To do: Implement normalization followed by feature map integration 
+
+
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -48,6 +51,16 @@ int main( int argc, char* argv[])
     split_input(input, channels);
 
     // extract orientations
+    Mat or0, or45, or90, or135;
+    Mat kernel0   = getGaborKernel(cv::Size(5,5), 0.8, 0        , 1, 0, 0);
+    Mat kernel45  = getGaborKernel(cv::Size(5,5), 0.8, CV_PI/4  , 1, 0, 0);
+    Mat kernel90  = getGaborKernel(cv::Size(5,5), 0.8, CV_PI/2  , 1, 0, 0);
+    Mat kernel135 = getGaborKernel(cv::Size(5,5), 0.8, 3*CV_PI/4, 1, 0, 0);
+
+    filter2D(channels[4], or0, CV_32F, kernel0);
+    filter2D(channels[4], or45, CV_32F, kernel45);
+    filter2D(channels[4], or90, CV_32F, kernel90);
+    filter2D(channels[4], or135, CV_32F, kernel135);
 
 
     //define pyramid variables
@@ -68,6 +81,10 @@ int main( int argc, char* argv[])
     construct_pyramid(channels[3], yellowPyr, 9);
     construct_pyramid(channels[4], intensPyr, 9);
     //Missing orientation pyramids
+    construct_pyramid(or0, or0Pyr, 9);
+    construct_pyramid(or45, or45Pyr, 9);
+    construct_pyramid(or90, or90Pyr, 9);
+    construct_pyramid(or135, or135Pyr, 9);
 
 
     // define feature maps
@@ -81,22 +98,22 @@ int main( int argc, char* argv[])
 
     //calculate feature maps for within pyramid features
     across_scale_diff(intensPyr, intens_fm);
-    // across_scale_diff(or0Pyr, or0_fm);
-    // across_scale_diff(or45Pyr, or135_fm);
-    // across_scale_diff(or90Pyr, or135_fm);
-    // across_scale_diff(or135Pyr, or135_fm);
+    across_scale_diff(or0Pyr, or0_fm);
+    across_scale_diff(or45Pyr, or135_fm);
+    across_scale_diff(or90Pyr, or135_fm);
+    across_scale_diff(or135Pyr, or135_fm);
     across_scale_opponency_diff(redPyr, greenPyr, oppRG_fm);
     across_scale_opponency_diff(bluePyr, yellowPyr, oppBY_fm);
 
     t = ((double)getTickCount() - t)/getTickFrequency();
     cout << "Total so far (without read and write) in seconds: " << t << endl;
 
-    namedWindow("in-", WINDOW_AUTOSIZE); imshow("in-", input);
-    namedWindow("red-", WINDOW_AUTOSIZE); imshow("red-", redPyr[0]);
-    namedWindow("green-", WINDOW_AUTOSIZE); imshow("green-", greenPyr[0]);
-    namedWindow("intens0", WINDOW_AUTOSIZE); imshow("intens0", oppRG_fm[0]);
-    namedWindow("intens0", WINDOW_AUTOSIZE); imshow("intens1", oppRG_fm[1]);
-    namedWindow("intens0", WINDOW_AUTOSIZE); imshow("intens2", oppRG_fm[2]);
+    namedWindow("in-", WINDOW_AUTOSIZE);        imshow("in-", input);
+    namedWindow("int-", WINDOW_AUTOSIZE);       imshow("int-", channels[4]);
+    namedWindow("intens0", WINDOW_AUTOSIZE);    imshow("intens0", or0Pyr[2]);
+    namedWindow("intens1", WINDOW_AUTOSIZE);    imshow("intens1", or45Pyr[2]);
+    namedWindow("intens2", WINDOW_AUTOSIZE);    imshow("intens2", or90Pyr[2]);
+    namedWindow("intens3", WINDOW_AUTOSIZE);    imshow("intens3", or135Pyr[2]);
 
     waitKey(100000);
     return 0;
@@ -215,7 +232,10 @@ void construct_pyramid(Mat& input, Mat* pyramid, int numLayers)
 */
 void across_scale_diff(Mat* inPyr, Mat* outPyr)
 {
+    // as defined in itti's paper
     int cL = 2, cU= 4, sL=3, sU=4;
+
+    //initialize variables
     int c, s, i = 0;
     Mat temp;
 
@@ -233,7 +253,21 @@ void across_scale_diff(Mat* inPyr, Mat* outPyr)
                 pyrUp(temp, tempX, Size(inPyr[c+j].cols, inPyr[c+j].rows));
                 temp = tempX.clone();
             }
-            absdiff(inPyr[c], temp, outPyr[i]);
+
+            if (c == cU - 2)
+            {
+                Mat tempX1, tempX2;
+                absdiff(inPyr[c], temp, tempX1);
+                pyrDown(tempX1, tempX2, Size(inPyr[cU-1].cols, inPyr[cU-1].rows));
+                pyrDown(tempX2, outPyr[i], Size(inPyr[cU].cols, inPyr[cU].rows));
+            } else if (c == cU - 1)
+            {
+                Mat tempX;
+                absdiff(inPyr[c], temp, tempX);
+                pyrDown(tempX, outPyr[i], Size(inPyr[cU].cols, inPyr[cU].rows));
+            } else {
+                absdiff(inPyr[c], temp, outPyr[i]);
+            }
         }
         ++i;
     }
@@ -275,7 +309,22 @@ void across_scale_opponency_diff(Mat* inPyr1, Mat* inPyr2, Mat* outPyr)
 
             tempC = inPyr1[c] - inPyr2[c];
             tempS = temp2 - temp1;
-            absdiff(tempC, tempS, outPyr[i]);
+
+
+                        if (c == cU - 2)
+                        {
+                            Mat tempX1, tempX2;
+                            absdiff(tempC, tempS, tempX1);
+                            pyrDown(tempX1, tempX2, Size(inPyr1[cU-1].cols, inPyr1[cU-1].rows));
+                            pyrDown(tempX2, outPyr[i], Size(inPyr1[cU].cols, inPyr1[cU].rows));
+                        } else if (c == cU - 1)
+                        {
+                            Mat tempX;
+                            absdiff(tempC, tempS, tempX);
+                            pyrDown(tempX, outPyr[i], Size(inPyr1[cU].cols, inPyr1[cU].rows));
+                        } else {
+                            absdiff(tempC, tempS, outPyr[i]);
+                        }
         }
         ++i;
     }
