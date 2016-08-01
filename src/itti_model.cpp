@@ -30,62 +30,85 @@ using namespace std;
 using namespace cv;
 
 void split_input(Mat&, Mat*);
-void split_input_to_visible(Mat&, Mat*);
 void construct_pyramid(Mat&, Mat*, int);
-
+void across_scale_diff(Mat*, Mat*);
+void across_scale_opponency_diff(Mat*, Mat*, Mat*);
 
 int main( int argc, char* argv[])
 {
     const char* filename = argv[1];
-
     Mat input = imread(filename, CV_LOAD_IMAGE_COLOR);
 
     double t = (double)getTickCount();
 
     Mat channels[5];
+
+    //extract colors and intensity.
+    //Channels in order: Red, Green, Blue, Yellow, Intensity
     split_input(input, channels);
 
-    Mat& red       = channels[0];
-    Mat& green     = channels[1];
-    Mat& blue      = channels[2];
-    Mat& yellow    = channels[3];
-    Mat& intensity = channels[4];
+    // extract orientations
 
-    t = (double)getTickCount();
 
-    Mat BluePyr[9];
-    construct_pyramid(channels[2], BluePyr, 7);
+    //define pyramid variables
+    Mat bluePyr[9];
+    Mat greenPyr[9];
+    Mat redPyr[9];
+    Mat yellowPyr[9];
+    Mat intensPyr[9];
+    Mat or0Pyr[9];
+    Mat or45Pyr[9];
+    Mat or90Pyr[9];
+    Mat or135Pyr[9];
+
+    //Construct pyramids and (maybe release memory for channels)
+    construct_pyramid(channels[0], redPyr, 9);
+    construct_pyramid(channels[1], greenPyr, 9);
+    construct_pyramid(channels[2], bluePyr, 9);
+    construct_pyramid(channels[3], yellowPyr, 9);
+    construct_pyramid(channels[4], intensPyr, 9);
+    //Missing orientation pyramids
+
+
+    // define feature maps
+    Mat oppRG_fm[6];
+    Mat oppBY_fm[6];
+    Mat or0_fm[6];
+    Mat or45_fm[6];
+    Mat or90_fm[6];
+    Mat or135_fm[6];
+    Mat intens_fm[6];
+
+    //calculate feature maps for within pyramid features
+    across_scale_diff(intensPyr, intens_fm);
+    // across_scale_diff(or0Pyr, or0_fm);
+    // across_scale_diff(or45Pyr, or135_fm);
+    // across_scale_diff(or90Pyr, or135_fm);
+    // across_scale_diff(or135Pyr, or135_fm);
+    across_scale_opponency_diff(redPyr, greenPyr, oppRG_fm);
+    across_scale_opponency_diff(bluePyr, yellowPyr, oppBY_fm);
 
     t = ((double)getTickCount() - t)/getTickFrequency();
-    cout << "Pyramid takes " << t << " seconds" << endl;
-    cout << "print a pyramid" << endl;
-    waitKey(100000);
-    namedWindow("0", WINDOW_AUTOSIZE); imshow("0", BluePyr[0]);
-    cout << "print a pyramid 1" << endl;
-    waitKey(100000);
-    namedWindow("1", WINDOW_AUTOSIZE); imshow("1", BluePyr[1]);
-    cout << "print a pyramid 3" << endl;
-    waitKey(100000);
-    namedWindow("3", WINDOW_AUTOSIZE); imshow("3", BluePyr[3]);
-    cout << "print a pyramid 5" << endl;
-    waitKey(100000);
-    namedWindow("5", WINDOW_AUTOSIZE); imshow("5", BluePyr[5]);
-    cout << "print a pyramid 7" << endl;
-    waitKey(100000);
-    namedWindow("6", WINDOW_AUTOSIZE); imshow("7", BluePyr[6]);
-    // namedWindow("i", WINDOW_AUTOSIZE); imshow("i", input);
-    cout << "DONE!" << endl;
+    cout << "Total so far (without read and write) in seconds: " << t << endl;
+
+    namedWindow("in-", WINDOW_AUTOSIZE); imshow("in-", input);
+    namedWindow("red-", WINDOW_AUTOSIZE); imshow("red-", redPyr[0]);
+    namedWindow("green-", WINDOW_AUTOSIZE); imshow("green-", greenPyr[0]);
+    namedWindow("intens0", WINDOW_AUTOSIZE); imshow("intens0", oppRG_fm[0]);
+    namedWindow("intens0", WINDOW_AUTOSIZE); imshow("intens1", oppRG_fm[1]);
+    namedWindow("intens0", WINDOW_AUTOSIZE); imshow("intens2", oppRG_fm[2]);
+
     waitKey(100000);
     return 0;
 }
 
 /**
- * Splits an input BGR image into 5 channels: red, green, blue, yellow
- * and intenisty. Calculations were done as described in Itti et al (1998)
- *
- * @param input    A BGR image (CV_8U)
- * @param channels An empty array of 5 Mat objects (CV_32F)
- */
+* Splits an input BGR image into 5 channels: red, green, blue, yellow
+* and intenisty. Calculations were done as described in Itti et al (1998)
+*
+* @param input    A BGR image (CV_8U)
+* @param channels An empty array of 3 Mat objects (CV_32F)
+*/
 void split_input(Mat& input, Mat* channels)
 {
     // Initialize 5 Matrix objects as floats
@@ -163,12 +186,12 @@ void split_input(Mat& input, Mat* channels)
 }
 
 /**
- * Constructs a gaussing pyramid with numLayers layers from an input image.
- *
- * @param input     An Mat of an image of dimensions larger than 2^numlayers
- * @param pyramid   A Mat array (index corresponds to the reduction factor)
- * @param numLayers Number of layers of the pyramid
- */
+* Constructs a gaussing pyramid with numLayers layers from an input image.
+*
+* @param input     An Mat of an image of dimensions larger than 2^numlayers
+* @param pyramid   A Mat array (index corresponds to the reduction factor)
+* @param numLayers Number of layers of the pyramid
+*/
 void construct_pyramid(Mat& input, Mat* pyramid, int numLayers)
 {
     //0th layers in the original image
@@ -180,5 +203,80 @@ void construct_pyramid(Mat& input, Mat* pyramid, int numLayers)
     for(i = 1; i < numLayers; ++i)
     {
         pyrDown(pyramid[i-1], pyramid[i], Size(pyramid[i-1].cols/2, pyramid[i-1].rows/2));
+    }
+}
+
+/**
+* Calculates the across scale difference between multiple layers of a pyramid
+* and outputs them into the output pyramid
+*
+* @param inPyr  Input pyramid
+* @param outPyr Output pyramid
+*/
+void across_scale_diff(Mat* inPyr, Mat* outPyr)
+{
+    int cL = 2, cU= 4, sL=3, sU=4;
+    int c, s, i = 0;
+    Mat temp;
+
+    for(c = cL; c <= cU; ++c)
+    {
+        for(s = sL; s <= sU; ++s)
+        {
+            temp = inPyr[c+s].clone();
+
+            int j;
+            for(j = s-1 ; j >= 0; --j){
+                Mat tempX;
+                // cout<<"inPyr[c+j]: rows: " <<  inPyr[c+j].rows << ". cols: " << inPyr[c+j].cols << endl;
+                // cout<<"temp:       rows: " <<  temp.rows << ". cols: " << temp.cols << endl;
+                pyrUp(temp, tempX, Size(inPyr[c+j].cols, inPyr[c+j].rows));
+                temp = tempX.clone();
+            }
+            absdiff(inPyr[c], temp, outPyr[i]);
+        }
+        ++i;
+    }
+}
+
+/**
+* Calculates the across scale difference between multiple layers of a pyramid
+* for an color opponency featyre and outputs them into the output pyramid
+*
+* @param inPyr1 Input pyramid for first color
+* @param inPyr2 Input pyramid for second color
+* @param outPyr Output pyramid
+*/
+void across_scale_opponency_diff(Mat* inPyr1, Mat* inPyr2, Mat* outPyr)
+{
+    int cL = 2, cU= 4, sL=3, sU=4;
+    int c, s, i = 0;
+    Mat temp1, temp2, tempC, tempS;
+
+    for(c = cL; c <= cU; ++c)
+    {
+        for(s = sL; s <= sU; ++s)
+        {
+            // scale both to information in first pyramid
+            // while both pyramids should be identical, this is a way to avoid
+            // potential errors and to enforce same dimensions for both
+            temp1 = inPyr1[c+s].clone();
+            temp2 = inPyr2[c+s].clone();
+
+            int j;
+            for(j = s-1 ; j >= 0; --j){
+                Mat tempX1, tempX2;
+                pyrUp(temp1, tempX1, Size(inPyr1[c+j].cols, inPyr1[c+j].rows));
+                pyrUp(temp2, tempX2, Size(inPyr1[c+j].cols, inPyr1[c+j].rows));
+
+                temp1 = tempX1.clone();
+                temp2 = tempX2.clone();
+            }
+
+            tempC = inPyr1[c] - inPyr2[c];
+            tempS = temp2 - temp1;
+            absdiff(tempC, tempS, outPyr[i]);
+        }
+        ++i;
     }
 }
