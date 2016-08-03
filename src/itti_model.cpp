@@ -1,25 +1,36 @@
 /**
 * Implementation of Itti's model
 *
-* - Image channels created from input (r_i, g_i, b_i):
+* 	- Image channels created from input (r_i, g_i, b_i):
 * 		1. Intensity = (r_i + g_i + b_i)/3
 * 		2. Blue      = b - (r+g)/2,              b = b_i / i , same for r and g
 * 		3. Red       = r - (b+g)/2
 * 		4. Green     = g - (r+b)/2
 * 		5. Yellow    = (r+g)/2 - |r-g|/2 - b
 *
-* - Image scales needed (i = 2-8, where scale i connotates a ratio of 1:i)
-* - Coarser scales are obtained through a low-pass filtering and subsampling
+* 	- Image scales needed (i = 2-8, where scale i connotates a ratio of 1:i)
+* 	- Coarser scales are obtained through a low-pass filtering and subsampling
 * 		= NTS: use a basic low-pass filter and subsample
+*
+* 	- Orientation filters are obtained using Gabor filter
+* 		= Not sure about gabor filter parameters
+*
+*	- Normalziation is performed
+*		= deviated from itti's model in multiplying by standard deviation
+*		  instead of (M - m)^2
+*		  	** [where M is global maxima and m is average of all maxima]
 *
 *
 *	** Points to note:
 *	- focus now on producing a prototype with very little regard for efficiency
 *	- try to modularize as much as possible to allow for simple enhancements
 *
+* 	To do:
+* 		- consider
+*
 */
 
-// To do: Implement normalization followed by feature map integration 
+// To do: Implement normalization followed by feature map integration
 
 
 #include <opencv2/core/core.hpp>
@@ -36,20 +47,36 @@ void split_input(Mat&, Mat*);
 void construct_pyramid(Mat&, Mat*, int);
 void across_scale_diff(Mat*, Mat*);
 void across_scale_opponency_diff(Mat*, Mat*, Mat*);
+void normalize(Mat);
+void normalize_by_maxMeanDiff(Mat);
+void normalize_by_stdev(Mat);
+void normalize_pyramid(Mat*, int);
+void integrate_single_pyramid(Mat*, Mat, int);
+void integrate_color_pyamids(Mat*, Mat*, Mat, int);
+void integrate_orient_pyamids(Mat*, Mat*, Mat*, Mat*, Mat, int);
+void my_imshow(string, Mat, int, int);
+
 
 int main( int argc, char* argv[])
 {
-    const char* filename = argv[1];
-    Mat input = imread(filename, CV_LOAD_IMAGE_COLOR);
+
+    Mat input = imread(argv[1], CV_LOAD_IMAGE_COLOR);
+
+    if(input.cols > 1000 || input.rows > 1000)
+    {
+        resize(input, input, Size(900,600));
+    }
 
     double t = (double)getTickCount();
 
     Mat channels[5];
 
+    cout << "Spliting input to RGBYI. " << endl;
     //extract colors and intensity.
     //Channels in order: Red, Green, Blue, Yellow, Intensity
     split_input(input, channels);
 
+    cout << "Extracting Orientation. " << endl;
     // extract orientations
     Mat or0, or45, or90, or135;
     Mat kernel0   = getGaborKernel(cv::Size(5,5), 0.8, 0        , 1, 0, 0);
@@ -63,6 +90,7 @@ int main( int argc, char* argv[])
     filter2D(channels[4], or135, CV_32F, kernel135);
 
 
+    cout << "Constructing Pyramids. " << endl;
     //define pyramid variables
     Mat bluePyr[9];
     Mat greenPyr[9];
@@ -87,6 +115,7 @@ int main( int argc, char* argv[])
     construct_pyramid(or135, or135Pyr, 9);
 
 
+    cout << "Calculating Across Scale Features. " << endl;
     // define feature maps
     Mat oppRG_fm[6];
     Mat oppBY_fm[6];
@@ -99,22 +128,73 @@ int main( int argc, char* argv[])
     //calculate feature maps for within pyramid features
     across_scale_diff(intensPyr, intens_fm);
     across_scale_diff(or0Pyr, or0_fm);
-    across_scale_diff(or45Pyr, or135_fm);
-    across_scale_diff(or90Pyr, or135_fm);
+    across_scale_diff(or45Pyr, or45_fm);
+    across_scale_diff(or90Pyr, or90_fm);
     across_scale_diff(or135Pyr, or135_fm);
     across_scale_opponency_diff(redPyr, greenPyr, oppRG_fm);
     across_scale_opponency_diff(bluePyr, yellowPyr, oppBY_fm);
 
+    cout << "Perfoming Normalization on Pyramids. " << endl;
+    // Normalize and Integrate
+    normalize_pyramid(oppRG_fm, 6);
+    normalize_pyramid(oppBY_fm, 6);
+    normalize_pyramid(intens_fm, 6);
+    normalize_pyramid(or0_fm, 6);
+    normalize_pyramid(or45_fm, 6);
+    normalize_pyramid(or90_fm, 6);
+    normalize_pyramid(or135_fm, 6);
+
+    cout << "Integrating Pyramids into single feature maps. " << endl;
+    //define overall feature mpas
+    Mat intens_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
+    Mat opp_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
+    Mat ori_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
+
+    cout << "Integrating Features" << endl;
+    //integrate feature maps for intenisty and color
+    integrate_single_pyramid(intens_fm, intens_FM, 6);
+    integrate_color_pyamids(oppBY_fm, oppRG_fm, opp_FM, 6);
+    integrate_orient_pyamids(or0_fm, or45_fm,or90_fm, or135_fm, ori_FM, 6);
+
+    //integrate all maps
+    Mat global_FM;
+    // global_FM = opp_FM + intens_FM + ori_FM;
+    max(ori_FM, intens_FM, global_FM);
+    max(global_FM, opp_FM, global_FM);
+    normalize(global_FM, global_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
+
     t = ((double)getTickCount() - t)/getTickFrequency();
     cout << "Total so far (without read and write) in seconds: " << t << endl;
 
-    namedWindow("in-", WINDOW_AUTOSIZE);        imshow("in-", input);
-    namedWindow("int-", WINDOW_AUTOSIZE);       imshow("int-", channels[4]);
-    namedWindow("intens0", WINDOW_AUTOSIZE);    imshow("intens0", or0Pyr[2]);
-    namedWindow("intens1", WINDOW_AUTOSIZE);    imshow("intens1", or45Pyr[2]);
-    namedWindow("intens2", WINDOW_AUTOSIZE);    imshow("intens2", or90Pyr[2]);
-    namedWindow("intens3", WINDOW_AUTOSIZE);    imshow("intens3", or135Pyr[2]);
 
+    if (argc > 2)
+    {
+        resize(global_FM, global_FM, Size(redPyr[0].cols, redPyr[0].rows));
+        resize(ori_FM, ori_FM, Size(redPyr[0].cols, redPyr[0].rows));
+        resize(opp_FM, opp_FM, Size(redPyr[0].cols, redPyr[0].rows));
+        resize(intens_FM, intens_FM, Size(redPyr[0].cols, redPyr[0].rows));
+        normalize(intens_FM, intens_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
+        normalize(ori_FM, ori_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
+        normalize(opp_FM, opp_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
+        normalize(intensPyr[0], intensPyr[0], 0.0, 1.0, NORM_MINMAX, CV_32F);
+
+        int x = 50;
+        int y = 50;
+        int dx = input.cols;
+        int dy = input.rows + 100;
+
+        Mat diff = intens_FM - ori_FM;
+
+        my_imshow("input", input, x, y);
+        // my_imshow("inten raw", intensPyr[0], x, y + dy);
+        my_imshow("diff b/w iten and ori", diff, x, y + dy);
+        my_imshow("global", global_FM, x + dx, y);
+        my_imshow("opponency", opp_FM, x+dx, y + dy);
+        my_imshow("orientation", ori_FM, x + 2 * dx, y);
+        my_imshow("intensity", intens_FM, x + 2 * dx,y + dy);
+    }
+
+    cout << "Done. " << endl;
     waitKey(100000);
     return 0;
 }
@@ -183,8 +263,11 @@ void split_input(Mat& input, Mat* channels)
                 r_p[y] = (R>0) ? R : 0;
                 g_p[y] = (G>0) ? G : 0;
                 y_p[y] = (Y>0) ? Y : 0;
-                i_p[y] = (b_p[y]+r_p[y]+g_p[y])/3
-                ;
+                // i_p[y] = (b_p[y]+r_p[y]+g_p[y])/3;
+                // i_p[y] = (0.7*b_p[y]+ 0.2*r_p[y]+ 0.8*g_p[y])/3;
+                // i_p[y] = (b_p[y]+r_p[y]+g_p[y] + y_p[y])/4;
+                i_p[y] = i;
+
             } else {
                 b_p[y] = 0;
                 r_p[y] = 0;
@@ -247,11 +330,8 @@ void across_scale_diff(Mat* inPyr, Mat* outPyr)
 
             int j;
             for(j = s-1 ; j >= 0; --j){
-                Mat tempX;
-                // cout<<"inPyr[c+j]: rows: " <<  inPyr[c+j].rows << ". cols: " << inPyr[c+j].cols << endl;
-                // cout<<"temp:       rows: " <<  temp.rows << ". cols: " << temp.cols << endl;
-                pyrUp(temp, tempX, Size(inPyr[c+j].cols, inPyr[c+j].rows));
-                temp = tempX.clone();
+
+                pyrUp(temp, temp, Size(inPyr[c+j].cols, inPyr[c+j].rows));
             }
 
             if (c == cU - 2)
@@ -268,8 +348,8 @@ void across_scale_diff(Mat* inPyr, Mat* outPyr)
             } else {
                 absdiff(inPyr[c], temp, outPyr[i]);
             }
+            ++i;
         }
-        ++i;
     }
 }
 
@@ -302,7 +382,6 @@ void across_scale_opponency_diff(Mat* inPyr1, Mat* inPyr2, Mat* outPyr)
                 Mat tempX1, tempX2;
                 pyrUp(temp1, tempX1, Size(inPyr1[c+j].cols, inPyr1[c+j].rows));
                 pyrUp(temp2, tempX2, Size(inPyr1[c+j].cols, inPyr1[c+j].rows));
-
                 temp1 = tempX1.clone();
                 temp2 = tempX2.clone();
             }
@@ -311,21 +390,137 @@ void across_scale_opponency_diff(Mat* inPyr1, Mat* inPyr2, Mat* outPyr)
             tempS = temp2 - temp1;
 
 
-                        if (c == cU - 2)
-                        {
-                            Mat tempX1, tempX2;
-                            absdiff(tempC, tempS, tempX1);
-                            pyrDown(tempX1, tempX2, Size(inPyr1[cU-1].cols, inPyr1[cU-1].rows));
-                            pyrDown(tempX2, outPyr[i], Size(inPyr1[cU].cols, inPyr1[cU].rows));
-                        } else if (c == cU - 1)
-                        {
-                            Mat tempX;
-                            absdiff(tempC, tempS, tempX);
-                            pyrDown(tempX, outPyr[i], Size(inPyr1[cU].cols, inPyr1[cU].rows));
-                        } else {
-                            absdiff(tempC, tempS, outPyr[i]);
-                        }
+            if (c == cU - 2)
+            {
+                Mat tempX1, tempX2;
+                absdiff(tempC, tempS, tempX1);
+                pyrDown(tempX1, tempX2, Size(inPyr1[cU-1].cols, inPyr1[cU-1].rows));
+                pyrDown(tempX2, outPyr[i], Size(inPyr1[cU].cols, inPyr1[cU].rows));
+            } else if (c == cU - 1)
+            {
+                Mat tempX;
+                absdiff(tempC, tempS, tempX);
+                pyrDown(tempX, outPyr[i], Size(inPyr1[cU].cols, inPyr1[cU].rows));
+            } else {
+                absdiff(tempC, tempS, outPyr[i]);
+            }
+            ++i;
         }
-        ++i;
     }
+}
+
+/**
+* Normalizes image to [0,1] range then multiplies by standard deviation
+*
+* @param input the input image
+*/
+void normalize_by_stdev(Mat input)
+{
+    Scalar mean, stdev;
+    normalize(input, input, 0.0, 1.0, NORM_MINMAX, CV_32F);
+    meanStdDev(input, mean, stdev);
+    multiply(stdev.val[0], input, input);
+}
+
+void normalize_by_maxMeanDiff(Mat input)
+{
+    cout << "top function" << endl;
+    Scalar mean, stdev;
+    double max;
+
+    normalize(input, input, 0.0, 1.0, NORM_MINMAX, CV_32F);
+    minMaxLoc(input, NULL, &max, NULL, NULL);
+    meanStdDev(input, mean, stdev);
+    cout << "mid function" << endl;
+    cout << "max val : " << max << endl;
+    double nVal = max - mean.val[0];
+    cout << "nval : " << nVal << endl;
+    multiply(max - mean.val[0], input, input);
+
+    cout << "end function" << endl;
+}
+
+/**
+* Wrapper class for noramlizer
+*
+* @param input the input image
+*/
+void normalize(Mat input)
+{
+    // normalize_by_stdev(input);
+    // normalize_by_maxMeanDiff(input);
+}
+
+/**
+* Itterates through a pyramid applying the normalize stdev function
+* @param pyr       visual pyramid
+* @param numLayers number of layers
+*/
+void normalize_pyramid(Mat* pyramid, int numLayers)
+{
+    int i;
+    for (i = 0; i < numLayers; ++i)
+    {
+        normalize(pyramid[i]);
+    }
+}
+
+void integrate_single_pyramid(Mat* pyramid, Mat f_map, int numLayers)
+{
+    int i;
+    //cout << "1" << endl;
+    add(pyramid[0], pyramid[1], f_map);
+    for (i = 2; i < numLayers; ++i)
+    {
+
+        //cout << i << endl;
+
+        //cout << "loop pyramid feature map size is : " << pyramid[i].cols << " cols and " << pyramid[i].rows << " rows." << endl;
+        f_map = f_map + pyramid[i];
+    }
+
+    //cout << "intese/single feature map size is : " << f_map.cols << " cols and " << f_map.rows << " rows." << endl;
+}
+
+void integrate_color_pyamids(Mat* pyramid1, Mat* pyramid2, Mat f_map, int numLayers)
+{
+    int i;
+    add(pyramid1[0], pyramid2[0], f_map);
+    for (i = 1; i < numLayers; ++i)
+    {
+        f_map = f_map + pyramid1[i] + pyramid2[i];
+    }
+
+    //cout << "Color feature map size is : " << f_map.cols << " cols and " << f_map.rows << " rows." << endl;
+}
+
+void integrate_orient_pyamids(Mat* pyr1, Mat* pyr2, Mat* pyr3, Mat* pyr4, Mat f_map, int numLayers)
+{
+
+    Mat fmap1(pyr1[0].rows, pyr1[0].cols, CV_32F, Scalar(0.0));
+    Mat fmap2(pyr1[0].rows, pyr1[0].cols, CV_32F, Scalar(0.0));
+    Mat fmap3(pyr1[0].rows, pyr1[0].cols, CV_32F, Scalar(0.0));
+    Mat fmap4(pyr1[0].rows, pyr1[0].cols, CV_32F, Scalar(0.0));
+
+    integrate_single_pyramid(pyr1, fmap1, 6);
+    integrate_single_pyramid(pyr2, fmap2, 6);
+    integrate_single_pyramid(pyr3, fmap3, 6);
+    integrate_single_pyramid(pyr4, fmap4, 6);
+
+    normalize(fmap1);
+    normalize(fmap2);
+    normalize(fmap3);
+    normalize(fmap4);
+
+    f_map = fmap1 + fmap2;
+    f_map = f_map + fmap3;
+    f_map = f_map + fmap4;
+}
+
+void my_imshow(string name, Mat matrix, int x, int y)
+{
+    namedWindow(name, WINDOW_AUTOSIZE);
+    moveWindow(name, x, y);
+    imshow(name, matrix);
+
 }
