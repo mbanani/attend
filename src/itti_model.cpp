@@ -39,6 +39,7 @@
 #include <cmath>
 #include <typeinfo>
 #include <iostream>
+#include <cstdio>
 
 using namespace std;
 using namespace cv;
@@ -62,35 +63,79 @@ int main( int argc, char* argv[])
 
     Mat input = imread(argv[1], CV_LOAD_IMAGE_COLOR);
 
-    if(input.cols > 1000 || input.rows > 1000)
+    if(input.cols > 600 || input.rows > 400)
     {
-        resize(input, input, Size(900,600));
+        resize(input, input, Size(600,400));
     }
 
     double t = (double)getTickCount();
 
     Mat channels[5];
 
-    cout << "Spliting input to RGBYI. " << endl;
+    //(output stages)cout << "Spliting input to RGBYI. " << endl;
     //extract colors and intensity.
     //Channels in order: Red, Green, Blue, Yellow, Intensity
     split_input(input, channels);
 
-    cout << "Extracting Orientation. " << endl;
+    //(output stages)cout << "Extracting Orientation. " << endl;
     // extract orientations
     Mat or0, or45, or90, or135;
-    Mat kernel0   = getGaborKernel(cv::Size(5,5), 0.8, 0        , 1, 0, 0);
-    Mat kernel45  = getGaborKernel(cv::Size(5,5), 0.8, CV_PI/4  , 1, 0, 0);
-    Mat kernel90  = getGaborKernel(cv::Size(5,5), 0.8, CV_PI/2  , 1, 0, 0);
-    Mat kernel135 = getGaborKernel(cv::Size(5,5), 0.8, 3*CV_PI/4, 1, 0, 0);
-
-    filter2D(channels[4], or0, CV_32F, kernel0);
-    filter2D(channels[4], or45, CV_32F, kernel45);
-    filter2D(channels[4], or90, CV_32F, kernel90);
-    filter2D(channels[4], or135, CV_32F, kernel135);
+    Size kerSize = Size(10, 10);
+    double sigma = 0.8;
+    double lam   = CV_PI;
+    double gamma = 1;
+    double psi   = CV_PI / 2;
 
 
-    cout << "Constructing Pyramids. " << endl;
+    //some fun i/o and godels method
+    if(argc > 2)
+    {
+        int argumentCode = atoi(argv[2]);
+
+        int index = 3;
+
+        if (argumentCode % 2 == 0)
+        {
+            sigma = atof(argv[index]);
+            cout << "sigma : " << sigma << endl;
+            ++index;
+        }
+
+        if (argumentCode % 3 == 0)
+        {
+            lam = atof(argv[index]);
+            cout << "lamda : " << lam << endl;
+            ++index;
+        }
+
+        if (argumentCode % 5 == 0)
+        {
+            gamma = atof(argv[index]);
+            cout << "gamma : " << gamma << endl;
+            ++index;
+        }
+
+        if (argumentCode % 7 == 0)
+        {
+            psi = atof(argv[index]);
+            cout << "psi : " << psi << endl;
+            ++index;
+        }
+
+    }
+
+    Mat kern0   = getGaborKernel(kerSize, sigma, 0         , lam, gamma, psi);
+    Mat kern45  = getGaborKernel(kerSize, sigma, 0.25*CV_PI, lam, gamma, psi);
+    Mat kern90  = getGaborKernel(kerSize, sigma, 0.5*CV_PI , lam, gamma, psi);
+    Mat kern135 = getGaborKernel(kerSize, sigma, 0.75*CV_PI, lam, gamma, psi);
+
+    filter2D(channels[4], or0  , CV_32F, kern0);
+    filter2D(channels[4], or45 , CV_32F, kern45);
+    filter2D(channels[4], or90 , CV_32F, kern90);
+    filter2D(channels[4], or135, CV_32F, kern135);
+
+
+    //(output stages)cout << "Constructing Pyramids. " << endl;
     //define pyramid variables
     Mat bluePyr[9];
     Mat greenPyr[9];
@@ -115,7 +160,7 @@ int main( int argc, char* argv[])
     construct_pyramid(or135, or135Pyr, 9);
 
 
-    cout << "Calculating Across Scale Features. " << endl;
+    //(output stages)cout << "Calculating Across Scale Features. " << endl;
     // define feature maps
     Mat oppRG_fm[6];
     Mat oppBY_fm[6];
@@ -134,7 +179,7 @@ int main( int argc, char* argv[])
     across_scale_opponency_diff(redPyr, greenPyr, oppRG_fm);
     across_scale_opponency_diff(bluePyr, yellowPyr, oppBY_fm);
 
-    cout << "Perfoming Normalization on Pyramids. " << endl;
+    //(output stages)cout << "Perfoming Normalization on Pyramids. " << endl;
     // Normalize and Integrate
     normalize_pyramid(oppRG_fm, 6);
     normalize_pyramid(oppBY_fm, 6);
@@ -144,13 +189,13 @@ int main( int argc, char* argv[])
     normalize_pyramid(or90_fm, 6);
     normalize_pyramid(or135_fm, 6);
 
-    cout << "Integrating Pyramids into single feature maps. " << endl;
+    //(output stages)cout << "Integrating Pyramids into single feature maps. " << endl;
     //define overall feature mpas
     Mat intens_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
     Mat opp_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
     Mat ori_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
 
-    cout << "Integrating Features" << endl;
+    //(output stages)cout << "Integrating Features" << endl;
     //integrate feature maps for intenisty and color
     integrate_single_pyramid(intens_fm, intens_FM, 6);
     integrate_color_pyamids(oppBY_fm, oppRG_fm, opp_FM, 6);
@@ -167,34 +212,41 @@ int main( int argc, char* argv[])
     cout << "Total so far (without read and write) in seconds: " << t << endl;
 
 
-    if (argc > 2)
-    {
-        resize(global_FM, global_FM, Size(redPyr[0].cols, redPyr[0].rows));
-        resize(ori_FM, ori_FM, Size(redPyr[0].cols, redPyr[0].rows));
-        resize(opp_FM, opp_FM, Size(redPyr[0].cols, redPyr[0].rows));
-        resize(intens_FM, intens_FM, Size(redPyr[0].cols, redPyr[0].rows));
-        normalize(intens_FM, intens_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
-        normalize(ori_FM, ori_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
-        normalize(opp_FM, opp_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
-        normalize(intensPyr[0], intensPyr[0], 0.0, 1.0, NORM_MINMAX, CV_32F);
 
-        int x = 50;
-        int y = 50;
-        int dx = input.cols;
-        int dy = input.rows + 100;
+    resize(global_FM, global_FM, Size(redPyr[0].cols, redPyr[0].rows));
+    resize(ori_FM, ori_FM, Size(redPyr[0].cols, redPyr[0].rows));
+    resize(opp_FM, opp_FM, Size(redPyr[0].cols, redPyr[0].rows));
+    resize(intens_FM, intens_FM, Size(redPyr[0].cols, redPyr[0].rows));
 
-        Mat diff = intens_FM - ori_FM;
+    double maxOpp, minOpp, maxOri, minOri, maxInt, minInt, maxAll;
+    minMaxLoc(opp_FM, &minOpp, &maxOpp, NULL, NULL);
+    minMaxLoc(ori_FM, &minOri, &maxOri, NULL, NULL);
+    minMaxLoc(intens_FM, &minInt, &maxInt, NULL, NULL);
 
-        my_imshow("input", input, x, y);
-        // my_imshow("inten raw", intensPyr[0], x, y + dy);
-        my_imshow("diff b/w iten and ori", diff, x, y + dy);
-        my_imshow("global", global_FM, x + dx, y);
-        my_imshow("opponency", opp_FM, x+dx, y + dy);
-        my_imshow("orientation", ori_FM, x + 2 * dx, y);
-        my_imshow("intensity", intens_FM, x + 2 * dx,y + dy);
-    }
+    maxAll = (maxOpp > maxOri)? maxOpp : maxOri;
+    maxAll = (maxAll > maxInt)? maxAll : maxInt;
 
-    cout << "Done. " << endl;
+    normalize(intens_FM, intens_FM      , minInt/maxAll, maxInt/maxAll, NORM_MINMAX, CV_32F);
+    normalize(ori_FM, ori_FM            , minOri/maxAll, maxOri/maxAll, NORM_MINMAX, CV_32F);
+    normalize(opp_FM, opp_FM            , minOpp/maxAll, maxOpp/maxAll, NORM_MINMAX, CV_32F);
+    normalize(intensPyr[0], intensPyr[0], 0.0, 1.0, NORM_MINMAX, CV_32F);
+
+    int x = 50;
+    int y = 50;
+    int dx = input.cols;
+    int dy = input.rows + 100;
+
+    Mat diff = intens_FM - ori_FM;
+
+    my_imshow("input", input, x, y);
+    my_imshow("inten raw", intensPyr[0], x, y + dy);
+    // my_imshow("diff b/w iten and ori", diff, x, y + dy);
+    my_imshow("global", global_FM, x + dx, y);
+    my_imshow("opponency", opp_FM, x+dx, y + dy);
+    my_imshow("orientation", ori_FM, x + 2 * dx, y);
+    my_imshow("intensity", intens_FM, x + 2 * dx,y + dy);
+
+    //(output stages)cout << "Done. " << endl;
     waitKey(100000);
     return 0;
 }
@@ -256,13 +308,13 @@ void split_input(Mat& input, Mat* channels)
                 R = r - (b+g)/2;
                 G = g - (b+r)/2;
                 B = b - (r+g)/2;
-                Y = -B - std::abs(r-g)/2;
+                Y = -b - std::abs(r-g);
 
                 //if extracted color value is negative, set to 0
-                b_p[y] = (B>0) ? B : 0;
-                r_p[y] = (R>0) ? R : 0;
-                g_p[y] = (G>0) ? G : 0;
-                y_p[y] = (Y>0) ? Y : 0;
+                b_p[y] = (B>0) ? B/2 : 0;
+                r_p[y] = (R>0) ? R/2 : 0;
+                g_p[y] = (G>0) ? G/2 : 0;
+                y_p[y] = (Y>0) ? Y/2 : 0;
                 // i_p[y] = (b_p[y]+r_p[y]+g_p[y])/3;
                 // i_p[y] = (0.7*b_p[y]+ 0.2*r_p[y]+ 0.8*g_p[y])/3;
                 // i_p[y] = (b_p[y]+r_p[y]+g_p[y] + y_p[y])/4;
@@ -424,20 +476,20 @@ void normalize_by_stdev(Mat input)
 
 void normalize_by_maxMeanDiff(Mat input)
 {
-    cout << "top function" << endl;
     Scalar mean, stdev;
     double max;
 
     normalize(input, input, 0.0, 1.0, NORM_MINMAX, CV_32F);
     minMaxLoc(input, NULL, &max, NULL, NULL);
     meanStdDev(input, mean, stdev);
-    cout << "mid function" << endl;
-    cout << "max val : " << max << endl;
     double nVal = max - mean.val[0];
-    cout << "nval : " << nVal << endl;
     multiply(max - mean.val[0], input, input);
 
-    cout << "end function" << endl;
+}
+
+void normalize_by_max_diff(Mat input)
+{
+
 }
 
 /**
@@ -447,6 +499,7 @@ void normalize_by_maxMeanDiff(Mat input)
 */
 void normalize(Mat input)
 {
+    normalize(input, input, 0.0, 1.0, NORM_MINMAX, CV_32F);
     // normalize_by_stdev(input);
     // normalize_by_maxMeanDiff(input);
 }
@@ -468,18 +521,11 @@ void normalize_pyramid(Mat* pyramid, int numLayers)
 void integrate_single_pyramid(Mat* pyramid, Mat f_map, int numLayers)
 {
     int i;
-    //cout << "1" << endl;
     add(pyramid[0], pyramid[1], f_map);
     for (i = 2; i < numLayers; ++i)
     {
-
-        //cout << i << endl;
-
-        //cout << "loop pyramid feature map size is : " << pyramid[i].cols << " cols and " << pyramid[i].rows << " rows." << endl;
         f_map = f_map + pyramid[i];
     }
-
-    //cout << "intese/single feature map size is : " << f_map.cols << " cols and " << f_map.rows << " rows." << endl;
 }
 
 void integrate_color_pyamids(Mat* pyramid1, Mat* pyramid2, Mat f_map, int numLayers)
@@ -491,7 +537,6 @@ void integrate_color_pyamids(Mat* pyramid1, Mat* pyramid2, Mat f_map, int numLay
         f_map = f_map + pyramid1[i] + pyramid2[i];
     }
 
-    //cout << "Color feature map size is : " << f_map.cols << " cols and " << f_map.rows << " rows." << endl;
 }
 
 void integrate_orient_pyamids(Mat* pyr1, Mat* pyr2, Mat* pyr3, Mat* pyr4, Mat f_map, int numLayers)
