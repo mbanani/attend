@@ -63,6 +63,8 @@ int main( int argc, char* argv[])
 
     Mat input = imread(argv[1], CV_LOAD_IMAGE_COLOR);
 
+    bool debug = true;
+
     if(input.cols > 600 || input.rows > 400)
     {
         resize(input, input, Size(600,400));
@@ -76,6 +78,17 @@ int main( int argc, char* argv[])
     //extract colors and intensity.
     //Channels in order: Red, Green, Blue, Yellow, Intensity
     split_input(input, channels);
+
+    if (debug)
+    {
+        my_imshow("input    ", input      , 50  , 50);
+        my_imshow("Channel 0", channels[0], 50  , 500);
+        my_imshow("Channel 1", channels[1], 700 , 50);
+        my_imshow("Channel 2", channels[2], 700 , 500);
+        my_imshow("Channel 3", channels[3], 1350, 50);
+        my_imshow("Channel 4", channels[4], 1350, 500);
+        waitKey(100000);
+    }
 
     //(output stages)cout << "Extracting Orientation. " << endl;
     // extract orientations
@@ -134,6 +147,16 @@ int main( int argc, char* argv[])
     filter2D(channels[4], or90 , CV_32F, kern90);
     filter2D(channels[4], or135, CV_32F, kern135);
 
+    if (debug)
+    {
+        my_imshow("input    ", input      , 50  , 50);
+        my_imshow("Intensity", channels[4], 50  , 500);
+        my_imshow("Channel 1", or0         , 700 , 50);
+        my_imshow("Channel 2", or45        , 700 , 500);
+        my_imshow("Channel 3", or90        , 1350, 50);
+        my_imshow("Channel 4", or135       , 1350, 500);
+        waitKey(100000);
+    }
 
     //(output stages)cout << "Constructing Pyramids. " << endl;
     //define pyramid variables
