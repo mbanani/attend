@@ -65,9 +65,9 @@ int main( int argc, char* argv[])
 
     bool debug = true;
 
-    if(input.cols > 600 || input.rows > 400)
+    if(input.cols > 500 || input.rows > 300)
     {
-        resize(input, input, Size(600,400));
+        resize(input, input, Size(500,300));
     }
 
     double t = (double)getTickCount();
@@ -82,11 +82,11 @@ int main( int argc, char* argv[])
     if (debug)
     {
         my_imshow("input    ", input      , 50  , 50);
-        my_imshow("Channel 0", channels[0], 50  , 500);
-        my_imshow("Channel 1", channels[1], 700 , 50);
-        my_imshow("Channel 2", channels[2], 700 , 500);
-        my_imshow("Channel 3", channels[3], 1350, 50);
-        my_imshow("Channel 4", channels[4], 1350, 500);
+        my_imshow("Channel 0", channels[0], 50  , 400);
+        my_imshow("Channel 1", channels[1], 600 , 50);
+        my_imshow("Channel 2", channels[2], 600 , 400);
+        my_imshow("Channel 3", channels[3], 1150, 50);
+        my_imshow("Channel 4", channels[4], 1150, 400);
         waitKey(100000);
     }
 
@@ -149,12 +149,12 @@ int main( int argc, char* argv[])
 
     if (debug)
     {
-        my_imshow("input    ", input      , 50  , 50);
-        my_imshow("Intensity", channels[4], 50  , 500);
-        my_imshow("Channel 1", or0         , 700 , 50);
-        my_imshow("Channel 2", or45        , 700 , 500);
-        my_imshow("Channel 3", or90        , 1350, 50);
-        my_imshow("Channel 4", or135       , 1350, 500);
+        my_imshow("input    ", input       , 50  , 50);
+        my_imshow("Intensity", channels[4] , 50  , 400);
+        my_imshow("Channel 1", or0         , 600 , 50);
+        my_imshow("Channel 2", or45        , 600 , 400);
+        my_imshow("Channel 3", or90        , 1150, 50);
+        my_imshow("Channel 4", or135       , 1150, 400);
         waitKey(100000);
     }
 
@@ -211,6 +211,97 @@ int main( int argc, char* argv[])
     normalize_pyramid(or45_fm, 6);
     normalize_pyramid(or90_fm, 6);
     normalize_pyramid(or135_fm, 6);
+
+    if (debug)
+    {
+        Mat* curr = oppRG_fm;
+
+        my_imshow("level 0", curr[0] , 50  , 50);
+        my_imshow("level 1", curr[1] , 50  , 400);
+        my_imshow("level 2", curr[2] , 600 , 50);
+        my_imshow("level 3", curr[3] , 600 , 400);
+        my_imshow("level 4", curr[4] , 1150, 50);
+        my_imshow("level 5", curr[5] , 1150, 400);
+        waitKey(100000);
+    }
+
+    if (debug)
+    {
+        Mat* curr = oppBY_fm;
+
+        my_imshow("level 0", curr[0] , 50  , 50);
+        my_imshow("level 1", curr[1] , 50  , 400);
+        my_imshow("level 2", curr[2] , 600 , 50);
+        my_imshow("level 3", curr[3] , 600 , 400);
+        my_imshow("level 4", curr[4] , 1150, 50);
+        my_imshow("level 5", curr[5] , 1150, 400);
+        waitKey(100000);
+    }
+
+    if (debug)
+    {
+        Mat* curr = intens_fm;
+
+        my_imshow("level 0", curr[0] , 50  , 50);
+        my_imshow("level 1", curr[1] , 50  , 400);
+        my_imshow("level 2", curr[2] , 600 , 50);
+        my_imshow("level 3", curr[3] , 600 , 400);
+        my_imshow("level 4", curr[4] , 1150, 50);
+        my_imshow("level 5", curr[5] , 1150, 400);
+        waitKey(100000);
+    }
+
+    if (debug)
+    {
+        Mat* curr = or0_fm;
+
+        my_imshow("level 0", curr[0] , 50  , 50);
+        my_imshow("level 1", curr[1] , 50  , 400);
+        my_imshow("level 2", curr[2] , 600 , 50);
+        my_imshow("level 3", curr[3] , 600 , 400);
+        my_imshow("level 4", curr[4] , 1150, 50);
+        my_imshow("level 5", curr[5] , 1150, 400);
+        waitKey(100000);
+    }
+
+    if (debug)
+    {
+        Mat* curr = or45_fm;
+
+        my_imshow("level 0", curr[0] , 50  , 50);
+        my_imshow("level 1", curr[1] , 50  , 400);
+        my_imshow("level 2", curr[2] , 600 , 50);
+        my_imshow("level 3", curr[3] , 600 , 400);
+        my_imshow("level 4", curr[4] , 1150, 50);
+        my_imshow("level 5", curr[5] , 1150, 400);
+        waitKey(100000);
+    }
+
+    if (debug)
+    {
+        Mat* curr = or90_fm;
+
+        my_imshow("level 0", curr[0] , 50  , 50);
+        my_imshow("level 1", curr[1] , 50  , 400);
+        my_imshow("level 2", curr[2] , 600 , 50);
+        my_imshow("level 3", curr[3] , 600 , 400);
+        my_imshow("level 4", curr[4] , 1150, 50);
+        my_imshow("level 5", curr[5] , 1150, 400);
+        waitKey(100000);
+    }
+
+    if (debug)
+    {
+        Mat* curr = or135_fm;
+
+        my_imshow("level 0", curr[0] , 50  , 50);
+        my_imshow("level 1", curr[1] , 50  , 400);
+        my_imshow("level 2", curr[2] , 600 , 50);
+        my_imshow("level 3", curr[3] , 600 , 400);
+        my_imshow("level 4", curr[4] , 1150, 50);
+        my_imshow("level 5", curr[5] , 1150, 400);
+        waitKey(100000);
+    }
 
     //(output stages)cout << "Integrating Pyramids into single feature maps. " << endl;
     //define overall feature mpas
