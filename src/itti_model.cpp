@@ -50,6 +50,7 @@ void across_scale_diff(Mat*, Mat*);
 void across_scale_opponency_diff(Mat*, Mat*, Mat*);
 void normalize(Mat);
 void normalize_by_maxMeanDiff(Mat);
+void normalize_by_maxima_diff(Mat);
 void normalize_by_stdev(Mat);
 void normalize_pyramid(Mat*, int);
 void integrate_single_pyramid(Mat*, Mat, int);
@@ -57,6 +58,8 @@ void integrate_color_pyamids(Mat*, Mat*, Mat, int);
 void integrate_orient_pyamids(Mat*, Mat*, Mat*, Mat*, Mat, int);
 void my_imshow(string, Mat, int, int);
 void debug_show_imgPyramid(Mat*, string);
+double get_average_local_maxima(Mat, float*, float*);
+
 
 
 
@@ -69,7 +72,7 @@ int main( int argc, char* argv[])
 
     // if(input.cols > 500 || input.rows > 300)
     // {
-        resize(input, input, Size(500,300));
+    resize(input, input, Size(500,300));
     // }
 
     double t = (double)getTickCount();
@@ -524,8 +527,14 @@ void normalize_by_maxMeanDiff(Mat input)
 
 }
 
-void normalize_by_max_diff(Mat input)
+void normalize_by_maxima_diff(Mat input)
 {
+    float globalMax, localMaxAvg;
+    get_average_local_maxima(input, &globalMax, &localMaxAvg);
+    cout << "New Global Max : " << globalMax << endl;
+    cout << "New Average Max: " << localMaxAvg << endl << endl;
+    float multipier = pow(globalMax - localMaxAvg, 2.0);
+    multiply(multipier, input, input);
 
 }
 
@@ -536,9 +545,10 @@ void normalize_by_max_diff(Mat input)
 */
 void normalize(Mat input)
 {
-    normalize(input, input, 0.0, 1.0, NORM_MINMAX, CV_32F);
+    // normalize(input, input, 0.0, 1.0, NORM_MINMAX, CV_32F);
     // normalize_by_stdev(input);
     // normalize_by_maxMeanDiff(input);
+    normalize_by_maxima_diff(input);
 }
 
 /**
@@ -603,7 +613,12 @@ void my_imshow(string name, Mat matrix, int x, int y)
 {
     namedWindow(name, WINDOW_AUTOSIZE);
     moveWindow(name, x, y);
-    imshow(name, matrix);
+
+    Mat newMatrix;
+    normalize(matrix, newMatrix, 0.0, 1.0, NORM_MINMAX, CV_32F);
+    imshow(name, newMatrix);
+
+    // imshow(name, matrix);
 }
 
 void debug_show_imgPyramid(Mat* imgPyramid, string pyramidInfo)
@@ -621,4 +636,39 @@ void debug_show_imgPyramid(Mat* imgPyramid, string pyramidInfo)
     my_imshow("level 5", imgPyramid[5] , 1150, 400);
     waitKey(100000);
     destroyAllWindows();
+}
+
+double get_average_local_maxima(Mat I, float *globalMax, float *localMaxAvg)
+{
+    float globalM = 0.0, sumLocalM = 0.0;
+    int numLocalMax = 0;
+
+    for (int i = 1; i < I.rows-1; i++)
+    {
+        for(int j = 1; j < I.cols-1; j++)
+        {
+            if(I.at<float>(i,j) >= I.at<float>(i-1, j-1) && I.at<float>(i,j) >= I.at<float>(i-1, j+1)
+                && I.at<float>(i,j) >= I.at<float>(i, j-1) && I.at<float>(i,j) >= I.at<float>(i, j+1)
+                && I.at<float>(i,j) >= I.at<float>(i+1, j-1) && I.at<float>(i,j) >= I.at<float>(i+1, j+1)
+                && I.at<float>(i,j) >= I.at<float>(i-1, j) && I.at<float>(i,j) >= I.at<float>(i+1, j))
+            {
+                cout << sumLocalM << "-" << numLocalMax << " || ";
+                numLocalMax++;
+                sumLocalM += I.at<float>(i,j);
+                if (I.at<float>(i,j) > globalM) {
+                    globalM = I.at<float>(i,j);
+                }
+            }
+        }
+    }
+
+    // cout << "Number of local maxima is " << numLocalMax << endl;
+    if (numLocalMax == 0) {
+        *localMaxAvg = 1.0;
+        *globalMax = 1.0;
+    } else {
+        *localMaxAvg = sumLocalM / numLocalMax;
+        *globalMax = globalM;
+    }
+    cout << endl << "End of function global max is " << *globalMax << " and local max avg is " << sumLocalM / 20 << endl;
 }
