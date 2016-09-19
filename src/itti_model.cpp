@@ -56,6 +56,8 @@ void integrate_single_pyramid(Mat*, Mat, int);
 void integrate_color_pyamids(Mat*, Mat*, Mat, int);
 void integrate_orient_pyamids(Mat*, Mat*, Mat*, Mat*, Mat, int);
 void my_imshow(string, Mat, int, int);
+void debug_show_imgPyramid(Mat*, string);
+
 
 
 int main( int argc, char* argv[])
@@ -63,12 +65,12 @@ int main( int argc, char* argv[])
 
     Mat input = imread(argv[1], CV_LOAD_IMAGE_COLOR);
 
-    bool debug = true;
+    bool debug = false;
 
-    if(input.cols > 500 || input.rows > 300)
-    {
+    // if(input.cols > 500 || input.rows > 300)
+    // {
         resize(input, input, Size(500,300));
-    }
+    // }
 
     double t = (double)getTickCount();
 
@@ -81,12 +83,12 @@ int main( int argc, char* argv[])
 
     if (debug)
     {
-        my_imshow("input    ", input      , 50  , 50);
-        my_imshow("Channel 0", channels[0], 50  , 400);
-        my_imshow("Channel 1", channels[1], 600 , 50);
-        my_imshow("Channel 2", channels[2], 600 , 400);
-        my_imshow("Channel 3", channels[3], 1150, 50);
-        my_imshow("Channel 4", channels[4], 1150, 400);
+        my_imshow("input    ",  input      , 50  , 50);
+        my_imshow("Red",        channels[0], 50  , 400);
+        my_imshow("Green",      channels[1], 600 , 50);
+        my_imshow("Blue",       channels[2], 600 , 400);
+        my_imshow("Yellow",     channels[3], 1150, 50);
+        my_imshow("Intensity",  channels[4], 1150, 400);
         waitKey(100000);
     }
 
@@ -212,95 +214,16 @@ int main( int argc, char* argv[])
     normalize_pyramid(or90_fm, 6);
     normalize_pyramid(or135_fm, 6);
 
+    // debug show levels
     if (debug)
     {
-        Mat* curr = oppRG_fm;
-
-        my_imshow("level 0", curr[0] , 50  , 50);
-        my_imshow("level 1", curr[1] , 50  , 400);
-        my_imshow("level 2", curr[2] , 600 , 50);
-        my_imshow("level 3", curr[3] , 600 , 400);
-        my_imshow("level 4", curr[4] , 1150, 50);
-        my_imshow("level 5", curr[5] , 1150, 400);
-        waitKey(100000);
-    }
-
-    if (debug)
-    {
-        Mat* curr = oppBY_fm;
-
-        my_imshow("level 0", curr[0] , 50  , 50);
-        my_imshow("level 1", curr[1] , 50  , 400);
-        my_imshow("level 2", curr[2] , 600 , 50);
-        my_imshow("level 3", curr[3] , 600 , 400);
-        my_imshow("level 4", curr[4] , 1150, 50);
-        my_imshow("level 5", curr[5] , 1150, 400);
-        waitKey(100000);
-    }
-
-    if (debug)
-    {
-        Mat* curr = intens_fm;
-
-        my_imshow("level 0", curr[0] , 50  , 50);
-        my_imshow("level 1", curr[1] , 50  , 400);
-        my_imshow("level 2", curr[2] , 600 , 50);
-        my_imshow("level 3", curr[3] , 600 , 400);
-        my_imshow("level 4", curr[4] , 1150, 50);
-        my_imshow("level 5", curr[5] , 1150, 400);
-        waitKey(100000);
-    }
-
-    if (debug)
-    {
-        Mat* curr = or0_fm;
-
-        my_imshow("level 0", curr[0] , 50  , 50);
-        my_imshow("level 1", curr[1] , 50  , 400);
-        my_imshow("level 2", curr[2] , 600 , 50);
-        my_imshow("level 3", curr[3] , 600 , 400);
-        my_imshow("level 4", curr[4] , 1150, 50);
-        my_imshow("level 5", curr[5] , 1150, 400);
-        waitKey(100000);
-    }
-
-    if (debug)
-    {
-        Mat* curr = or45_fm;
-
-        my_imshow("level 0", curr[0] , 50  , 50);
-        my_imshow("level 1", curr[1] , 50  , 400);
-        my_imshow("level 2", curr[2] , 600 , 50);
-        my_imshow("level 3", curr[3] , 600 , 400);
-        my_imshow("level 4", curr[4] , 1150, 50);
-        my_imshow("level 5", curr[5] , 1150, 400);
-        waitKey(100000);
-    }
-
-    if (debug)
-    {
-        Mat* curr = or90_fm;
-
-        my_imshow("level 0", curr[0] , 50  , 50);
-        my_imshow("level 1", curr[1] , 50  , 400);
-        my_imshow("level 2", curr[2] , 600 , 50);
-        my_imshow("level 3", curr[3] , 600 , 400);
-        my_imshow("level 4", curr[4] , 1150, 50);
-        my_imshow("level 5", curr[5] , 1150, 400);
-        waitKey(100000);
-    }
-
-    if (debug)
-    {
-        Mat* curr = or135_fm;
-
-        my_imshow("level 0", curr[0] , 50  , 50);
-        my_imshow("level 1", curr[1] , 50  , 400);
-        my_imshow("level 2", curr[2] , 600 , 50);
-        my_imshow("level 3", curr[3] , 600 , 400);
-        my_imshow("level 4", curr[4] , 1150, 50);
-        my_imshow("level 5", curr[5] , 1150, 400);
-        waitKey(100000);
+        debug_show_imgPyramid(oppRG_fm, "RG Opponency");
+        debug_show_imgPyramid(oppBY_fm, "BY Opponency");
+        debug_show_imgPyramid(intens_fm, "Intensity");
+        debug_show_imgPyramid(or0_fm,   "Orientation 0");
+        debug_show_imgPyramid(or45_fm,  "Orientation 45");
+        debug_show_imgPyramid(or90_fm,  "Orientation 90");
+        debug_show_imgPyramid(or135_fm, "Orientation 135");
     }
 
     //(output stages)cout << "Integrating Pyramids into single feature maps. " << endl;
@@ -317,9 +240,9 @@ int main( int argc, char* argv[])
 
     //integrate all maps
     Mat global_FM;
-    // global_FM = opp_FM + intens_FM + ori_FM;
-    max(ori_FM, intens_FM, global_FM);
-    max(global_FM, opp_FM, global_FM);
+    global_FM = opp_FM + intens_FM + ori_FM;
+    // max(ori_FM, intens_FM, global_FM);
+    // max(global_FM, opp_FM, global_FM);
     normalize(global_FM, global_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
 
     t = ((double)getTickCount() - t)/getTickFrequency();
@@ -422,13 +345,13 @@ void split_input(Mat& input, Mat* channels)
                 R = r - (b+g)/2;
                 G = g - (b+r)/2;
                 B = b - (r+g)/2;
-                Y = -b - std::abs(r-g);
+                Y = -B - std::abs(r-g)/2;
 
                 //if extracted color value is negative, set to 0
-                b_p[y] = (B>0) ? B/2 : 0;
-                r_p[y] = (R>0) ? R/2 : 0;
-                g_p[y] = (G>0) ? G/2 : 0;
-                y_p[y] = (Y>0) ? Y/2 : 0;
+                b_p[y] = (B>0) ? B : 0;
+                r_p[y] = (R>0) ? R : 0;
+                g_p[y] = (G>0) ? G : 0;
+                y_p[y] = (Y>0) ? Y : 0;
                 // i_p[y] = (b_p[y]+r_p[y]+g_p[y])/3;
                 // i_p[y] = (0.7*b_p[y]+ 0.2*r_p[y]+ 0.8*g_p[y])/3;
                 // i_p[y] = (b_p[y]+r_p[y]+g_p[y] + y_p[y])/4;
@@ -681,5 +604,21 @@ void my_imshow(string name, Mat matrix, int x, int y)
     namedWindow(name, WINDOW_AUTOSIZE);
     moveWindow(name, x, y);
     imshow(name, matrix);
+}
 
+void debug_show_imgPyramid(Mat* imgPyramid, string pyramidInfo)
+{
+
+    for (int i = 0; i < 6; i++) {
+        resize(imgPyramid[i], imgPyramid[i], Size(500,300));
+    }
+
+    my_imshow(pyramidInfo, imgPyramid[0] , 50  , 50);
+    my_imshow("level 1", imgPyramid[1] , 50  , 400);
+    my_imshow("level 2", imgPyramid[2] , 600 , 50);
+    my_imshow("level 3", imgPyramid[3] , 600 , 400);
+    my_imshow("level 4", imgPyramid[4] , 1150, 50);
+    my_imshow("level 5", imgPyramid[5] , 1150, 400);
+    waitKey(100000);
+    destroyAllWindows();
 }
