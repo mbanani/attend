@@ -1,1 +1,0 @@
-/home/mohamed/attend/src/CMakeFiles/itti.dir

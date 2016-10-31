@@ -70,10 +70,10 @@ int main( int argc, char* argv[])
 
     bool debug = false;
 
-    // if(input.cols > 500 || input.rows > 300)
-    // {
+    if(input.cols > 500 || input.rows > 300)
+    {
     resize(input, input, Size(500,300));
-    // }
+    }
 
     double t = (double)getTickCount();
 
@@ -104,43 +104,6 @@ int main( int argc, char* argv[])
     double gamma = 1;
     double psi   = CV_PI / 2;
 
-
-    //some fun i/o and godels method
-    if(argc > 2)
-    {
-        int argumentCode = atoi(argv[2]);
-
-        int index = 3;
-
-        if (argumentCode % 2 == 0)
-        {
-            sigma = atof(argv[index]);
-            cout << "sigma : " << sigma << endl;
-            ++index;
-        }
-
-        if (argumentCode % 3 == 0)
-        {
-            lam = atof(argv[index]);
-            cout << "lamda : " << lam << endl;
-            ++index;
-        }
-
-        if (argumentCode % 5 == 0)
-        {
-            gamma = atof(argv[index]);
-            cout << "gamma : " << gamma << endl;
-            ++index;
-        }
-
-        if (argumentCode % 7 == 0)
-        {
-            psi = atof(argv[index]);
-            cout << "psi : " << psi << endl;
-            ++index;
-        }
-
-    }
 
     Mat kern0   = getGaborKernel(kerSize, sigma, 0         , lam, gamma, psi);
     Mat kern45  = getGaborKernel(kerSize, sigma, 0.25*CV_PI, lam, gamma, psi);
@@ -217,6 +180,7 @@ int main( int argc, char* argv[])
     normalize_pyramid(or90_fm, 6);
     normalize_pyramid(or135_fm, 6);
 
+
     // debug show levels
     if (debug)
     {
@@ -241,11 +205,17 @@ int main( int argc, char* argv[])
     integrate_color_pyamids(oppBY_fm, oppRG_fm, opp_FM, 6);
     integrate_orient_pyamids(or0_fm, or45_fm,or90_fm, or135_fm, ori_FM, 6);
 
+
+
+    normalize(intens_FM);
+    normalize(ori_FM);
+    normalize(opp_FM);
+
     //integrate all maps
     Mat global_FM;
-    global_FM = opp_FM + intens_FM + ori_FM;
-    // max(ori_FM, intens_FM, global_FM);
-    // max(global_FM, opp_FM, global_FM);
+    // global_FM = opp_FM + intens_FM + ori_FM;
+    max(ori_FM, intens_FM, global_FM);
+    max(global_FM, opp_FM, global_FM);
     normalize(global_FM, global_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
 
     t = ((double)getTickCount() - t)/getTickFrequency();
@@ -258,6 +228,8 @@ int main( int argc, char* argv[])
     resize(opp_FM, opp_FM, Size(redPyr[0].cols, redPyr[0].rows));
     resize(intens_FM, intens_FM, Size(redPyr[0].cols, redPyr[0].rows));
 
+
+
     double maxOpp, minOpp, maxOri, minOri, maxInt, minInt, maxAll;
     minMaxLoc(opp_FM, &minOpp, &maxOpp, NULL, NULL);
     minMaxLoc(ori_FM, &minOri, &maxOri, NULL, NULL);
@@ -269,7 +241,9 @@ int main( int argc, char* argv[])
     normalize(intens_FM, intens_FM      , minInt/maxAll, maxInt/maxAll, NORM_MINMAX, CV_32F);
     normalize(ori_FM, ori_FM            , minOri/maxAll, maxOri/maxAll, NORM_MINMAX, CV_32F);
     normalize(opp_FM, opp_FM            , minOpp/maxAll, maxOpp/maxAll, NORM_MINMAX, CV_32F);
-    normalize(intensPyr[0], intensPyr[0], 0.0, 1.0, NORM_MINMAX, CV_32F);
+    // normalize(intensPyr[0], intensPyr[0], 0.0, 1.0, NORM_MINMAX, CV_32F);
+    //
+
 
     int x = 50;
     int y = 50;
@@ -545,10 +519,10 @@ void normalize_by_maxima_diff(Mat input)
 */
 void normalize(Mat input)
 {
-    // normalize(input, input, 0.0, 1.0, NORM_MINMAX, CV_32F);
     // normalize_by_stdev(input);
     // normalize_by_maxMeanDiff(input);
     normalize_by_maxima_diff(input);
+    normalize(input, input, 0.0, 1.0, NORM_MINMAX, CV_32F);
 }
 
 /**
@@ -599,14 +573,16 @@ void integrate_orient_pyamids(Mat* pyr1, Mat* pyr2, Mat* pyr3, Mat* pyr4, Mat f_
     integrate_single_pyramid(pyr3, fmap3, 6);
     integrate_single_pyramid(pyr4, fmap4, 6);
 
-    normalize(fmap1);
-    normalize(fmap2);
-    normalize(fmap3);
-    normalize(fmap4);
+    // normalize(fmap1);
+    // normalize(fmap2);
+    // normalize(fmap3);
+    // normalize(fmap4);
 
     f_map = fmap1 + fmap2;
     f_map = f_map + fmap3;
     f_map = f_map + fmap4;
+
+    // normalize(f_map);
 }
 
 void my_imshow(string name, Mat matrix, int x, int y)
@@ -618,7 +594,6 @@ void my_imshow(string name, Mat matrix, int x, int y)
     normalize(matrix, newMatrix, 0.0, 1.0, NORM_MINMAX, CV_32F);
     imshow(name, newMatrix);
 
-    // imshow(name, matrix);
 }
 
 void debug_show_imgPyramid(Mat* imgPyramid, string pyramidInfo)
@@ -652,7 +627,7 @@ double get_average_local_maxima(Mat I, float *globalMax, float *localMaxAvg)
                 && I.at<float>(i,j) >= I.at<float>(i+1, j-1) && I.at<float>(i,j) >= I.at<float>(i+1, j+1)
                 && I.at<float>(i,j) >= I.at<float>(i-1, j) && I.at<float>(i,j) >= I.at<float>(i+1, j))
             {
-                cout << sumLocalM << "-" << numLocalMax << " || ";
+                // cout << sumLocalM << "-" << numLocalMax << " || ";
                 numLocalMax++;
                 sumLocalM += I.at<float>(i,j);
                 if (I.at<float>(i,j) > globalM) {
@@ -664,11 +639,10 @@ double get_average_local_maxima(Mat I, float *globalMax, float *localMaxAvg)
 
     // cout << "Number of local maxima is " << numLocalMax << endl;
     if (numLocalMax == 0) {
-        *localMaxAvg = 1.0;
-        *globalMax = 1.0;
+        *localMaxAvg = 0.0;
+        *globalMax = 0.0;
     } else {
         *localMaxAvg = sumLocalM / numLocalMax;
         *globalMax = globalM;
     }
-    cout << endl << "End of function global max is " << *globalMax << " and local max avg is " << sumLocalM / 20 << endl;
 }
