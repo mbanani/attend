@@ -48,10 +48,8 @@ void normalize_by_maxima_diff(Mat input)
 */
 void normalize(Mat input)
 {
-    // normalize_by_stdev(input);
-    // normalize_by_maxMeanDiff(input);
-    normalize_by_maxima_diff(input);
     normalize(input, input, 0.0, 1.0, NORM_MINMAX, CV_32F);
+    normalize_by_maxima_diff(input);
 }
 
 /**

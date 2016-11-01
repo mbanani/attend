@@ -1,4 +1,5 @@
 #include "saliency.h"
+#include "normalize.h"
 
 using namespace std;
 using namespace cv;
@@ -249,14 +250,13 @@ void integrate_orient_pyamids(Mat* pyr1, Mat* pyr2, Mat* pyr3, Mat* pyr4, Mat f_
     integrate_single_pyramid(pyr3, fmap3, 6);
     integrate_single_pyramid(pyr4, fmap4, 6);
 
-    // normalize(fmap1);
-    // normalize(fmap2);
-    // normalize(fmap3);
-    // normalize(fmap4);
+    normalize(fmap1);
+    normalize(fmap2);
+    normalize(fmap3);
+    normalize(fmap4);
 
     f_map = fmap1 + fmap2;
     f_map = f_map + fmap3;
     f_map = f_map + fmap4;
 
-    // normalize(f_map);
 }
