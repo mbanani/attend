@@ -29,7 +29,6 @@
 */
 
 
-
 #include "saliency.h"
 #include "normalize.h"
 
@@ -37,31 +36,66 @@ using namespace std;
 using namespace cv;
 
 
-
 void my_imshow(string, Mat, int, int);
 void debug_show_imgPyramid(Mat*, string);
+Mat generateSaliency(Mat, float*, bool, bool);
+Mat generateRGBYSaliency(Mat, float*, bool);
+Mat generateRGBSaliency(Mat, float*, bool);
 
 
 int main( int argc, char* argv[])
 {
 
     Mat input = imread(argv[1], CV_LOAD_IMAGE_COLOR);
-
-    bool debug = false;
-
-    if(input.cols > 500 || input.rows > 300)
-    {
     resize(input, input, Size(500,300));
-    }
+
+    float object1[4] = {1.0, 0.0, 0.0, 0.0};
+    float object2[4] = {0.0, 1.0, 0.0, 0.0};
+    float object3[4] = {0.0, 0.0, 1.0, 0.0};
+    float object4[4] = {0.0, 0.0, 0.0, 1.0};
+    float object5[4] = {0.25, 0.25, 0.25, 0.25};
+
+
+    saliency1 = generateRGBYSaliency(input, object1, true);
+    saliency2 = generateRGBYSaliency(input, object2, true);
+    saliency3 = generateRGBYSaliency(input, object3, true);
+    saliency4 = generateRGBYSaliency(input, object4, true);
+    Mat saliency5 = generateRGBYSaliency(input, object5, true);
+
+    resize(saliency1, saliency1, Size(500,300));
+    resize(saliency2, saliency2, Size(500,300));
+    resize(saliency3, saliency3, Size(500,300));
+    resize(saliency4, saliency4, Size(500,300));
+    resize(saliency5, saliency5, Size(500,300));
+
+
+    my_imshow("Red",  saliency1, 50  , 50);
+    my_imshow("Green",  saliency2, 50 , 400);
+    my_imshow("Blue",saliency3, 600  ,50);
+    my_imshow("Yellow",saliency4, 600, 400);
+    my_imshow("Original",input, 1150 , 50);
+    my_imshow("Intensity",saliency4, 1150 , 400);
+    waitKey(100000);
+
+}
+
+/**
+ * Initial attempt at outputing normalized saliency maps
+ *
+ * @param  image          input image
+ * @param  objectFeatures an array of floats determining the normalization weights
+ * @return                an object-specific saliency map
+ */
+Mat generateSaliency(Mat input, float* objectFeatures, bool avgGlobal, bool debug)
+{
 
     double t = (double)getTickCount();
 
     Mat channels[5];
 
-    //(output stages)cout << "Spliting input to RGBYI. " << endl;
     //extract colors and intensity.
     //Channels in order: Red, Green, Blue, Yellow, Intensity
-    split_input(input, channels);
+    split_rgbyi(input, channels);
 
     if (debug)
     {
@@ -74,7 +108,6 @@ int main( int argc, char* argv[])
         waitKey(100000);
     }
 
-    //(output stages)cout << "Extracting Orientation. " << endl;
     // extract orientations
     Mat or0, or45, or90, or135;
     Size kerSize = Size(10, 10);
@@ -105,7 +138,6 @@ int main( int argc, char* argv[])
         waitKey(100000);
     }
 
-    //(output stages)cout << "Constructing Pyramids. " << endl;
     //define pyramid variables
     Mat bluePyr[9];
     Mat greenPyr[9];
@@ -149,7 +181,6 @@ int main( int argc, char* argv[])
     across_scale_opponency_diff(redPyr, greenPyr, oppRG_fm);
     across_scale_opponency_diff(bluePyr, yellowPyr, oppBY_fm);
 
-    //(output stages)cout << "Perfoming Normalization on Pyramids. " << endl;
     // Normalize and Integrate
     normalize_pyramid(oppRG_fm, 6);
     normalize_pyramid(oppBY_fm, 6);
@@ -172,7 +203,6 @@ int main( int argc, char* argv[])
         debug_show_imgPyramid(or135_fm, "Orientation 135");
     }
 
-    //(output stages)cout << "Integrating Pyramids into single feature maps. " << endl;
     //define overall feature mpas
     Mat intens_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
     Mat opp_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
@@ -184,67 +214,85 @@ int main( int argc, char* argv[])
     integrate_color_pyamids(oppBY_fm, oppRG_fm, opp_FM, 6);
     integrate_orient_pyamids(or0_fm, or45_fm,or90_fm, or135_fm, ori_FM, 6);
 
-
-
     normalize(intens_FM);
     normalize(ori_FM);
     normalize(opp_FM);
 
+    normalize(intens_FM,    intens_FM,  0.0, objectFeatures[0], NORM_MINMAX, CV_32F);
+    normalize(ori_FM,       ori_FM,     0.0, objectFeatures[1], NORM_MINMAX, CV_32F);
+    normalize(opp_FM,       opp_FM,     0.0, objectFeatures[2], NORM_MINMAX, CV_32F);
+
     //integrate all maps
     Mat global_FM;
-    // global_FM = opp_FM + intens_FM + ori_FM;
-    max(ori_FM, intens_FM, global_FM);
-    max(global_FM, opp_FM, global_FM);
+
+    if(avgGlobal){
+        global_FM = opp_FM + intens_FM + ori_FM;
+    } else {
+        max(ori_FM, intens_FM, global_FM);
+        max(global_FM, opp_FM, global_FM);
+    }
+
     normalize(global_FM, global_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
 
     t = ((double)getTickCount() - t)/getTickFrequency();
     cout << "Total so far (without read and write) in seconds: " << t << endl;
 
-
-
-    resize(global_FM, global_FM, Size(redPyr[0].cols, redPyr[0].rows));
-    resize(ori_FM, ori_FM, Size(redPyr[0].cols, redPyr[0].rows));
-    resize(opp_FM, opp_FM, Size(redPyr[0].cols, redPyr[0].rows));
-    resize(intens_FM, intens_FM, Size(redPyr[0].cols, redPyr[0].rows));
-
-
-
-    double maxOpp, minOpp, maxOri, minOri, maxInt, minInt, maxAll;
-    minMaxLoc(opp_FM, &minOpp, &maxOpp, NULL, NULL);
-    minMaxLoc(ori_FM, &minOri, &maxOri, NULL, NULL);
-    minMaxLoc(intens_FM, &minInt, &maxInt, NULL, NULL);
-
-    maxAll = (maxOpp > maxOri)? maxOpp : maxOri;
-    maxAll = (maxAll > maxInt)? maxAll : maxInt;
-
-    normalize(intens_FM, intens_FM      , minInt/maxAll, maxInt/maxAll, NORM_MINMAX, CV_32F);
-    normalize(ori_FM, ori_FM            , minOri/maxAll, maxOri/maxAll, NORM_MINMAX, CV_32F);
-    normalize(opp_FM, opp_FM            , minOpp/maxAll, maxOpp/maxAll, NORM_MINMAX, CV_32F);
-    // normalize(intensPyr[0], intensPyr[0], 0.0, 1.0, NORM_MINMAX, CV_32F);
-    //
-
-
-    int x = 50;
-    int y = 50;
-    int dx = input.cols;
-    int dy = input.rows + 100;
-
-    Mat diff = intens_FM - ori_FM;
-
-    my_imshow("input", input, x, y);
-    my_imshow("inten raw", intensPyr[0], x, y + dy);
-    // my_imshow("diff b/w iten and ori", diff, x, y + dy);
-    my_imshow("global", global_FM, x + dx, y);
-    my_imshow("opponency", opp_FM, x+dx, y + dy);
-    my_imshow("orientation", ori_FM, x + 2 * dx, y);
-    my_imshow("intensity", intens_FM, x + 2 * dx,y + dy);
-
-    //(output stages)cout << "Done. " << endl;
-    waitKey(100000);
-    return 0;
+    return global_FM;
 }
 
+/**
+ * Initial attempt at outputing normalized saliency maps
+ *
+ * @param  input    input image
+ * @param  rgby     an array of floats determining the color value
+ * @return          a color-specific saliency map
+ */
+Mat generateRGBYSaliency(Mat input, float* rgbyCoeff, bool avgGlobal)
+{
 
+    double t = (double)getTickCount();
+
+    Mat channels[5];
+
+    //extract colors and intensity.
+    //Channels in order: Red, Green, Blue, Yellow
+    split_rgbyi(input, channels);
+
+    Mat newColor = rgbyCoeff[0] * channels[0] + rgbyCoeff[1] * channels[1];
+    newColor = newColor + rgbyCoeff[2] * channels[2] +rgbyCoeff[3] * channels[3];
+
+    //define pyramid variables
+    Mat colorPyr[9];
+
+    //Construct pyramids and (maybe release memory for channels)
+    construct_pyramid(newColor, colorPyr, 9);
+
+    //(output stages)cout << "Calculating Across Scale Features. " << endl;
+    // define feature maps
+    Mat color_fm[6];
+
+    //calculate feature maps for within pyramid features
+    across_scale_diff(colorPyr, color_fm);
+
+    // Normalize and Integrate
+    normalize_pyramid(color_fm, 6);
+
+    //define overall feature mpas
+    Mat color_FM(color_fm[0].rows, color_fm[0].cols, CV_32F, Scalar(0.0));
+
+    //(output stages)cout << "Integrating Features" << endl;
+    //integrate feature maps for intenisty and color
+    integrate_single_pyramid(color_fm, color_FM, 6);
+
+    normalize(color_FM);
+
+    normalize(color_FM,  color_FM,   0.0, 1.0, NORM_MINMAX, CV_32F);
+
+    t = ((double)getTickCount() - t)/getTickFrequency();
+    cout << "Total so far (without read and write) in seconds: " << t << endl;
+
+    return color_FM;
+}
 
 
 void my_imshow(string name, Mat matrix, int x, int y)

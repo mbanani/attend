@@ -7,7 +7,6 @@
 #include <cstdio>
 
 
-void split_rgbi(cv::Mat&, cv::Mat*);
 void split_rgbyi(cv::Mat&, cv::Mat*);
 void construct_pyramid(cv::Mat&, cv::Mat*, int);
 void across_scale_diff(cv::Mat*, cv::Mat*);
