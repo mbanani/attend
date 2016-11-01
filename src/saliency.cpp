@@ -11,7 +11,7 @@ using namespace cv;
 * @param input    A BGR image (CV_8U)
 * @param channels An empty array of 3 Mat objects (CV_32F)
 */
-void split_input(Mat& input, Mat* channels)
+void split_rgbyi(Mat& input, Mat* channels)
 {
     // Initialize 5 Matrix objects as floats
     int nRows = input.rows;
@@ -89,6 +89,76 @@ void split_input(Mat& input, Mat* channels)
     channels[3] = yellow;
     channels[4] = intensity;
 }
+
+/**
+* Splits an input BGR image into 5 channels: red, green, blue and intenisty.
+*
+* rgb are currently normalized by intensity
+*
+* @param input    A BGR image (CV_8U)
+* @param channels An empty array of 3 Mat objects (CV_32F)
+*/
+void split_rgbi(Mat& input, Mat* channels)
+{
+    // Initialize 5 Matrix objects as floats
+    int nRows = input.rows;
+    int nCols = input.cols;
+
+    Mat red         = Mat(nRows, nCols, CV_32F);
+    Mat green       = Mat(nRows, nCols, CV_32F);
+    Mat blue        = Mat(nRows, nCols, CV_32F);
+    Mat intensity   = Mat(nRows, nCols, CV_32F);
+
+    //define vctors for itterating through the matrices
+    Vec3b *in_p;
+    int x,y;
+    float i;
+    float *r_p, *b_p, *g_p, *i_p;
+
+    //Itterate through rows and columns of all the matrices to fill out
+    //the channels according to the following:
+    //  1. Decouple the input colors from their hue through diving by intensity
+    //  2. Color values are shown below
+    //  3. If the color is less than a threshold value (set to 0), make it 0.
+    for( x = 0; x < nRows; ++x)
+    {
+        // set pointer values to current row
+        in_p  = input.ptr<Vec3b>(x);
+        r_p   = red.ptr<float>(x);
+        g_p   = green.ptr<float>(x);
+        b_p   = blue.ptr<float>(x);
+        i_p   = intensity.ptr<float>(x);
+
+        //iterate through column using previously defined pointers
+        for ( y = 0; y < nCols; ++y)
+        {
+            //calculate initial intensity to make sure it's non-zero
+            i = ((in_p[y])[0] + (in_p[y])[1] + (in_p[y])[2])/(3);
+
+            if (i > 0)
+            {
+                //calculate decoupled color input values from hue
+                b_p[y] = (in_p[y])[0]/i;
+                g_p[y] = (in_p[y])[1]/i;
+                r_p[y] = (in_p[y])[2]/i;
+                i_p[y] = i;
+
+            } else {
+                b_p[y] = 0;
+                r_p[y] = 0;
+                g_p[y] = 0;
+                i_p[y] = 0;
+            }
+        }
+    }
+
+    // assign the Mat objects to their corresponding channel array index
+    channels[0] = red;
+    channels[1] = green;
+    channels[2] = blue;
+    channels[3] = intensity;
+}
+
 
 /**
 * Constructs a gaussing pyramid with numLayers layers from an input image.
