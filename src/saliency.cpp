@@ -216,7 +216,6 @@ void across_scale_opponency_diff(Mat* inPyr1, Mat* inPyr2, Mat* outPyr)
 }
 
 
-
 void integrate_single_pyramid(Mat* pyramid, Mat f_map, int numLayers)
 {
     int i;

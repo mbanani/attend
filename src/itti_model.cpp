@@ -31,50 +31,61 @@
 
 #include "saliency.h"
 #include "normalize.h"
+#include "util.h"
 
 using namespace std;
 using namespace cv;
 
 
-void my_imshow(string, Mat, int, int);
-void debug_show_imgPyramid(Mat*, string);
 Mat generateSaliency(Mat, float*, bool, bool);
 Mat generateRGBYSaliency(Mat, float*, bool);
-Mat generateRGBSaliency(Mat, float*, bool);
 
 
 int main( int argc, char* argv[])
 {
 
     Mat input = imread(argv[1], CV_LOAD_IMAGE_COLOR);
-    resize(input, input, Size(500,300));
 
-    float object1[4] = {1.0, 0.0, 0.0, 0.0};
-    float object2[4] = {0.0, 1.0, 0.0, 0.0};
-    float object3[4] = {0.0, 0.0, 1.0, 0.0};
-    float object4[4] = {0.0, 0.0, 0.0, 1.0};
-    float object5[4] = {0.25, 0.25, 0.25, 0.25};
+    int width = 1000;
+    float ratio = ( (float) input.rows / (float) input.cols);
+    cout << "Rows " << input.rows << ". Cols " << input.cols << ". ratio " << ratio << endl;
+    int height = ratio * width;
+
+    width = width > input.cols ? width: input.cols;
+    height = height > input.rows ? height: input.rows;
+
+    int d_width = 500;
+    int d_height = 500 * ratio;
+
+    resize(input, input, Size(width,height));
+
+    float object1[5] = {1.0, 0.0, 0.0, 0.0};
+    float object2[5] = {0.0, 1.0, 0.0, 0.0};
+    float object3[5] = {0.0, 0.0, 1.0, 0.0};
+    float object4[5] = {0.0, 0.0, 0.0, 1.0};
+    float object5[5] = {0.9, 0.0, 0.0, 0.1};
 
 
-    saliency1 = generateRGBYSaliency(input, object1, true);
-    saliency2 = generateRGBYSaliency(input, object2, true);
-    saliency3 = generateRGBYSaliency(input, object3, true);
-    saliency4 = generateRGBYSaliency(input, object4, true);
+    Mat saliency1 = generateRGBYSaliency(input, object1, true);
+    Mat saliency2 = generateRGBYSaliency(input, object2, true);
+    Mat saliency3 = generateRGBYSaliency(input, object3, true);
+    Mat saliency4 = generateRGBYSaliency(input, object4, true);
     Mat saliency5 = generateRGBYSaliency(input, object5, true);
 
-    resize(saliency1, saliency1, Size(500,300));
-    resize(saliency2, saliency2, Size(500,300));
-    resize(saliency3, saliency3, Size(500,300));
-    resize(saliency4, saliency4, Size(500,300));
-    resize(saliency5, saliency5, Size(500,300));
+    resize(saliency1, saliency1, Size(d_width,d_height));
+    resize(saliency2, saliency2, Size(d_width,d_height));
+    resize(saliency3, saliency3, Size(d_width,d_height));
+    resize(saliency4, saliency4, Size(d_width,d_height));
+    resize(saliency5, saliency5, Size(d_width,d_height));
+    resize(input, input, Size(d_width,d_height));
 
 
     my_imshow("Red",  saliency1, 50  , 50);
-    my_imshow("Green",  saliency2, 50 , 400);
-    my_imshow("Blue",saliency3, 600  ,50);
-    my_imshow("Yellow",saliency4, 600, 400);
-    my_imshow("Original",input, 1150 , 50);
-    my_imshow("Intensity",saliency4, 1150 , 400);
+    my_imshow("Green",  saliency2, 50 , 200 + d_height);
+    my_imshow("Blue",saliency3, 100 + d_width  ,50);
+    my_imshow("Yellow",saliency4, 100 + d_width, 200 + d_height);
+    my_imshow("Original",input, 150 + 2*d_width , 50);
+    my_imshow("Custom",saliency5, 150 + 2*d_width , 200 + d_height);
     waitKey(100000);
 
 }
@@ -292,33 +303,4 @@ Mat generateRGBYSaliency(Mat input, float* rgbyCoeff, bool avgGlobal)
     cout << "Total so far (without read and write) in seconds: " << t << endl;
 
     return color_FM;
-}
-
-
-void my_imshow(string name, Mat matrix, int x, int y)
-{
-    namedWindow(name, WINDOW_AUTOSIZE);
-    moveWindow(name, x, y);
-
-    Mat newMatrix;
-    normalize(matrix, newMatrix, 0.0, 1.0, NORM_MINMAX, CV_32F);
-    imshow(name, newMatrix);
-
-}
-
-void debug_show_imgPyramid(Mat* imgPyramid, string pyramidInfo)
-{
-
-    for (int i = 0; i < 6; i++) {
-        resize(imgPyramid[i], imgPyramid[i], Size(500,300));
-    }
-
-    my_imshow(pyramidInfo, imgPyramid[0] , 50  , 50);
-    my_imshow("level 1", imgPyramid[1] , 50  , 400);
-    my_imshow("level 2", imgPyramid[2] , 600 , 50);
-    my_imshow("level 3", imgPyramid[3] , 600 , 400);
-    my_imshow("level 4", imgPyramid[4] , 1150, 50);
-    my_imshow("level 5", imgPyramid[5] , 1150, 400);
-    waitKey(100000);
-    destroyAllWindows();
 }
