@@ -62,30 +62,39 @@ int main( int argc, char* argv[])
     float object1[5] = {1.0, 0.0, 0.0, 0.0};
     float object2[5] = {0.0, 1.0, 0.0, 0.0};
     float object3[5] = {0.0, 0.0, 1.0, 0.0};
-    float object4[5] = {0.0, 0.0, 0.0, 1.0};
-    float object5[5] = {0.9, 0.0, 0.0, 0.1};
+    float object4[5] = {1.0, 1.0, 1.0, 0.1};
+    // float object5[5] = {0.0, 0.0, 0.0, 1.0};
 
 
-    Mat saliency1 = generateRGBYSaliency(input, object1, true);
-    Mat saliency2 = generateRGBYSaliency(input, object2, true);
-    Mat saliency3 = generateRGBYSaliency(input, object3, true);
-    Mat saliency4 = generateRGBYSaliency(input, object4, true);
-    Mat saliency5 = generateRGBYSaliency(input, object5, true);
+    Mat saliency1 = generateSaliency(input, object1, false, false);
+    Mat saliency2 = generateSaliency(input, object2, false, false);
+    Mat saliency3 = generateSaliency(input, object3, false, false);
+    Mat saliency4 = generateSaliency(input, object4, false, false);
+    // Mat saliency5 = generateRGBYSaliency(input, object5, false);
 
     resize(saliency1, saliency1, Size(d_width,d_height));
     resize(saliency2, saliency2, Size(d_width,d_height));
     resize(saliency3, saliency3, Size(d_width,d_height));
     resize(saliency4, saliency4, Size(d_width,d_height));
-    resize(saliency5, saliency5, Size(d_width,d_height));
+    // resize(saliency5, saliency5, Size(d_width,d_height));
     resize(input, input, Size(d_width,d_height));
 
+    normalize(saliency1, saliency1, 0.0, 255, NORM_MINMAX, CV_32F);
+    normalize(saliency2, saliency2, 0.0, 255, NORM_MINMAX, CV_32F);
+    normalize(saliency3, saliency3, 0.0, 255, NORM_MINMAX, CV_32F);
+    normalize(saliency4, saliency4, 0.0, 255, NORM_MINMAX, CV_32F);
+    imwrite( "intesnity map.jpg", saliency1 );
+    imwrite( "orientation map.jpg", saliency2 );
+    imwrite( "opponency map.jpg", saliency3 );
+    imwrite( "overall map.jpg", saliency4 );
 
-    my_imshow("Red",  saliency1, 50  , 50);
-    my_imshow("Green",  saliency2, 50 , 200 + d_height);
-    my_imshow("Blue",saliency3, 100 + d_width  ,50);
-    my_imshow("Yellow",saliency4, 100 + d_width, 200 + d_height);
+
+    my_imshow("intensity",  saliency1, 50  , 50);
+    my_imshow("orientation",  saliency2, 50 , 200 + d_height);
+    my_imshow("color opponency",  saliency3, 100 + d_width  ,50);
+    my_imshow("overall",saliency4, 100 + d_width, 200 + d_height);
     my_imshow("Original",input, 150 + 2*d_width , 50);
-    my_imshow("Custom",saliency5, 150 + 2*d_width , 200 + d_height);
+    // my_imshow("Custom",saliency5, 150 + 2*d_width , 200 + d_height);
     waitKey(100000);
 
 }
