@@ -32,6 +32,7 @@
 #include "saliency.h"
 #include "normalize.h"
 #include "util.h"
+#include "edgeBox_interface.h"
 
 using namespace std;
 using namespace cv;
@@ -54,46 +55,66 @@ int main( int argc, char* argv[])
     width = width > input.cols ? width: input.cols;
     height = height > input.rows ? height: input.rows;
 
+    // Display features
     int d_width = 500;
     int d_height = 500 * ratio;
 
     resize(input, input, Size(width,height));
 
-    float object1[5] = {1.0, 0.0, 0.0, 0.0};
-    float object2[5] = {0.0, 1.0, 0.0, 0.0};
-    float object3[5] = {0.0, 0.0, 1.0, 0.0};
-    float object4[5] = {1.0, 1.0, 1.0, 0.1};
-    // float object5[5] = {0.0, 0.0, 0.0, 1.0};
+    float object[3] = {0.0, 0.0, 1.0};
 
 
-    Mat saliency1 = generateSaliency(input, object1, false, false);
-    Mat saliency2 = generateSaliency(input, object2, false, false);
-    Mat saliency3 = generateSaliency(input, object3, false, false);
-    Mat saliency4 = generateSaliency(input, object4, false, false);
-    // Mat saliency5 = generateRGBYSaliency(input, object5, false);
+    Mat saliency = generateSaliency(input, object, false, false);
 
-    resize(saliency1, saliency1, Size(d_width,d_height));
-    resize(saliency2, saliency2, Size(d_width,d_height));
-    resize(saliency3, saliency3, Size(d_width,d_height));
-    resize(saliency4, saliency4, Size(d_width,d_height));
-    // resize(saliency5, saliency5, Size(d_width,d_height));
-    resize(input, input, Size(d_width,d_height));
+    Mat output;
 
-    normalize(saliency1, saliency1, 0.0, 255, NORM_MINMAX, CV_32F);
-    normalize(saliency2, saliency2, 0.0, 255, NORM_MINMAX, CV_32F);
-    normalize(saliency3, saliency3, 0.0, 255, NORM_MINMAX, CV_32F);
-    normalize(saliency4, saliency4, 0.0, 255, NORM_MINMAX, CV_32F);
-    imwrite( "intesnity map.jpg", saliency1 );
-    imwrite( "orientation map.jpg", saliency2 );
-    imwrite( "opponency map.jpg", saliency3 );
-    imwrite( "overall map.jpg", saliency4 );
+    resize(input, output, input.size());
+    resize(saliency, saliency, input.size());
 
 
-    my_imshow("intensity",  saliency1, 50  , 50);
-    my_imshow("orientation",  saliency2, 50 , 200 + d_height);
-    my_imshow("color opponency",  saliency3, 100 + d_width  ,50);
-    my_imshow("overall",saliency4, 100 + d_width, 200 + d_height);
-    my_imshow("Original",input, 150 + 2*d_width , 50);
+    Rect bbox1(580, 250, 100, 150);
+    Rect bbox2(610, 310, 50, 50);
+    Rect bbox3(80, 250, 100, 150);
+    double conf1 = calculateSaliencyScore(saliency, bbox1);
+    double conf2 = calculateSaliencyScore(saliency, bbox2);
+    double conf3 = calculateSaliencyScore(saliency, bbox3);
+
+
+    std::ostringstream strs;
+    strs << conf1;
+    std::string confStr1 = strs.str();
+
+    std::ostringstream strs2;
+    strs2 << conf2;
+    std::string confStr2 = strs2.str();
+    std::ostringstream strs3;
+    strs3 << conf3;
+    std::string confStr3 = strs3.str();
+
+
+    drawBB(output, bbox1, confStr1, Scalar(0,0,255));
+    drawBB(saliency, bbox1, confStr1, Scalar(0,0,255));
+
+    drawBB(output, bbox2, confStr2, Scalar(0,0,255));
+    drawBB(saliency, bbox2, confStr2, Scalar(0,0,255));
+
+    drawBB(output, bbox3, confStr3, Scalar(0,0,255));
+    drawBB(saliency, bbox3, confStr3, Scalar(0,0,255));
+
+    resize(output, output, Size(d_width, d_height));
+    resize(saliency, saliency, Size(d_width, d_height));
+
+
+    my_imshow("output",  output, 50  , 50);
+
+    my_imshow("saliency",  saliency, 100 + width  , 50);
+
+
+    // my_imshow("intensity",  saliency1, 50  , 50);
+    // my_imshow("orientation",  saliency2, 50 , 200 + d_height);
+    // my_imshow("color opponency",  saliency3, 100 + d_width  ,50);
+    // my_imshow("overall",saliency4, 100 + d_width, 200 + d_height);
+    // my_imshow("Original",input, 150 + 2*d_width , 50);
     // my_imshow("Custom",saliency5, 150 + 2*d_width , 200 + d_height);
     waitKey(100000);
 
