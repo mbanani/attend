@@ -32,7 +32,7 @@
 #include "saliency.h"
 #include "normalize.h"
 #include "util.h"
-#include "edgeBox_interface.h"
+#include "objectProposal.h"
 
 using namespace std;
 using namespace cv;
@@ -40,6 +40,9 @@ using namespace cv;
 
 Mat generateSaliency(Mat, float*, bool, bool);
 Mat generateRGBYSaliency(Mat, float*, bool);
+proposal topPropoal(Mat&, proposal*, int, float*, int);
+float* learnFeature(Mat&, proposal);
+
 
 
 int main( int argc, char* argv[])
@@ -59,55 +62,42 @@ int main( int argc, char* argv[])
     int d_width = 500;
     int d_height = 500 * ratio;
 
-    resize(input, input, Size(width,height));
+    // resize(input, input, Size(width,height));
 
-    float object[3] = {0.0, 0.0, 1.0};
+    proposal originalProp;
+    originalProp.bbox = Rect(550, 250, 180, 150);
+    originalProp.confScore = 10000;
+    float* features = learnFeature(input, originalProp);
+    int thresh = 10000;  // 1000/10000
 
+    cout << "Learned features : " << features[0] << ", " << features[1] << ", " << features[2] << endl;
 
-    Mat saliency = generateSaliency(input, object, false, false);
+    int proposalList[3][5] = {{550, 250, 180, 150, 1000}, {610, 310, 50, 50, 1000}, {80, 250, 100, 150, 1000}};
+
+    proposal* objProps = readInProposals(proposalList, 3, 1);
+    proposal topProp = topPropoal(input, objProps, 3, features, thresh);
+
 
     Mat output;
 
+
+    // resize(saliency, saliency, input.size());
     resize(input, output, input.size());
-    resize(saliency, saliency, input.size());
+
+    drawBB(output, topProp, Scalar(0,0,255));
+    // drawBB(saliency, topProp, Scalar(0,0,255));
+    //
+    // drawBB(output, bbox2, confStr2, Scalar(0,0,255));
+    // drawBB(saliency, bbox2, confStr2, Scalar(0,0,255));
+    //
+    // drawBB(output, bbox3, confStr3, Scalar(0,0,255));
+    // drawBB(saliency, bbox3, confStr3, Scalar(0,0,255));
+
+    // resize(saliency, saliency, Size(d_width, d_height));
 
 
-    Rect bbox1(580, 250, 100, 150);
-    Rect bbox2(610, 310, 50, 50);
-    Rect bbox3(80, 250, 100, 150);
-    double conf1 = calculateSaliencyScore(saliency, bbox1);
-    double conf2 = calculateSaliencyScore(saliency, bbox2);
-    double conf3 = calculateSaliencyScore(saliency, bbox3);
 
-
-    std::ostringstream strs;
-    strs << conf1;
-    std::string confStr1 = strs.str();
-
-    std::ostringstream strs2;
-    strs2 << conf2;
-    std::string confStr2 = strs2.str();
-    std::ostringstream strs3;
-    strs3 << conf3;
-    std::string confStr3 = strs3.str();
-
-
-    drawBB(output, bbox1, confStr1, Scalar(0,0,255));
-    drawBB(saliency, bbox1, confStr1, Scalar(0,0,255));
-
-    drawBB(output, bbox2, confStr2, Scalar(0,0,255));
-    drawBB(saliency, bbox2, confStr2, Scalar(0,0,255));
-
-    drawBB(output, bbox3, confStr3, Scalar(0,0,255));
-    drawBB(saliency, bbox3, confStr3, Scalar(0,0,255));
-
-    resize(output, output, Size(d_width, d_height));
-    resize(saliency, saliency, Size(d_width, d_height));
-
-
-    my_imshow("output",  output, 50  , 50);
-
-    my_imshow("saliency",  saliency, 100 + width  , 50);
+    // my_imshow("saliency",  saliency, 100 + width  , 50);
 
 
     // my_imshow("intensity",  saliency1, 50  , 50);
@@ -116,6 +106,18 @@ int main( int argc, char* argv[])
     // my_imshow("overall",saliency4, 100 + d_width, 200 + d_height);
     // my_imshow("Original",input, 150 + 2*d_width , 50);
     // my_imshow("Custom",saliency5, 150 + 2*d_width , 200 + d_height);
+
+    float oriFeat[3] = {0.0, 1.0, 0.0};
+    Mat oriSaliency = generateSaliency(input, oriFeat, false, false);
+
+    resize(oriSaliency, oriSaliency, input.size());
+    drawBB(oriSaliency, topProp, Scalar(0,0,255));
+    resize(output, output, input.size());
+    my_imshow("orientation",  oriSaliency, 500  , 50);
+    my_imshow("output",  output, 50  , 50);
+
+
+
     waitKey(100000);
 
 }
@@ -259,9 +261,13 @@ Mat generateSaliency(Mat input, float* objectFeatures, bool avgGlobal, bool debu
     normalize(ori_FM);
     normalize(opp_FM);
 
-    normalize(intens_FM,    intens_FM,  0.0, objectFeatures[0], NORM_MINMAX, CV_32F);
-    normalize(ori_FM,       ori_FM,     0.0, objectFeatures[1], NORM_MINMAX, CV_32F);
-    normalize(opp_FM,       opp_FM,     0.0, objectFeatures[2], NORM_MINMAX, CV_32F);
+    // normalize(intens_FM,    intens_FM,  0.0, objectFeatures[0], NORM_MINMAX, CV_32F);
+    // normalize(ori_FM,       ori_FM,     0.0, objectFeatures[1], NORM_MINMAX, CV_32F);
+    // normalize(opp_FM,       opp_FM,     0.0, objectFeatures[2], NORM_MINMAX, CV_32F);
+
+    intens_FM = intens_FM * objectFeatures[0];
+    ori_FM = ori_FM * objectFeatures[1];
+    opp_FM = opp_FM * objectFeatures[2];
 
     //integrate all maps
     Mat global_FM;
@@ -333,4 +339,72 @@ Mat generateRGBYSaliency(Mat input, float* rgbyCoeff, bool avgGlobal)
     cout << "Total so far (without read and write) in seconds: " << t << endl;
 
     return color_FM;
+}
+
+/**
+ * Outputs the best proposal (or the first to exceed a specific threshold)
+ * @param  image    [description]
+ * @param  objProps [description]
+ * @param  thresh   a percentage confidence multipled by 10,000
+ * @return          The best proposal (or first to exceed threshold)
+ */
+proposal topPropoal(Mat& image, proposal* objProps, int numProposals, float* features, int thresh)
+{
+	proposal topProp;
+    Mat saliencyMap = generateSaliency(image, features, false, false);
+    resize(saliencyMap, saliencyMap, image.size());
+
+
+    // my_imshow("output",  saliencyMap, 50  , 50);
+    // waitKey(100000);
+
+    objProps[0].saliencyScore = calculateSaliencyScore(saliencyMap, objProps[0]);
+    topProp = objProps[0];
+
+	for(int i = 1; i < numProposals; i++)
+	{
+        objProps[i].saliencyScore = calculateSaliencyScore(saliencyMap, objProps[i]);
+
+        if(objProps[i].saliencyScore > thresh){
+            return objProps[i];
+        } else if(objProps[i].saliencyScore > topProp.saliencyScore)
+        {
+            topProp = objProps[i];
+        }
+	}
+    return topProp;
+}
+
+float* learnFeature(Mat& image, proposal prop)
+{
+    float* score = new float[3];
+
+    float features0[3] = {1.0, 0.0, 0.0};
+    float features1[3] = {0.0, 1.0, 0.0};
+    float features2[3] = {0.0, 0.0, 1.0};
+
+    Mat saliency0 = generateSaliency(image, features0, false, false);
+    Mat saliency1 = generateSaliency(image, features1, false, false);
+    Mat saliency2 = generateSaliency(image, features2, false, false);
+
+    resize(saliency0, saliency0, image.size());
+    resize(saliency1, saliency1, image.size());
+    resize(saliency2, saliency2, image.size());
+
+    score[0] = (float) calculateSaliencyScore(saliency0, prop);
+    score[1] = (float) calculateSaliencyScore(saliency1, prop);
+    score[2] = (float) calculateSaliencyScore(saliency2, prop);
+
+    float sum = score[0] + score[1] + score[2];
+    score[0] = score[0] / sum;
+    score[1] = score[1] / sum;
+    score[2] = score[2] / sum;
+
+    cout << "score for 0: " << calculateSaliencyScore(saliency0, prop) << endl;
+    cout << "score for 1: " << calculateSaliencyScore(saliency1, prop) << endl;
+    cout << "score for 2: " << calculateSaliencyScore(saliency2, prop) << endl;
+
+    cout << "sum: " << sum << endl;
+
+    return score;
 }
