@@ -35,3 +35,4 @@ int calculateSaliencyScore(cv::Mat&, proposal);
 void drawBB(cv::Mat&, proposal, cv::Scalar);
 // void drawBB(cv::Mat&, cv::Rect, const std::string&, cv::Scalar);
 proposal* readInProposals(int[][5], int, int);
+double  calculateIOU(cv::Rect, cv::Rect);

@@ -68,7 +68,15 @@ void drawBB(Mat& image, proposal prop, Scalar color)
 	putText(image, strs.str(), Point(prop.bbox.x, prop.bbox.y), FONT_HERSHEY_SIMPLEX, 1, color, 2);
 }
 
-
+/**
+ * Reads in n proposals from an nx5 in array.
+ * Each row has (x,y,w,h, confScore*10000)
+ *
+ * @param  propList   	The list of proposals
+ * @param  numProposals the number of proposals (rows in the propList)
+ * @param  label        The label associated with those proposals ?
+ * @return              Returns an array of proposals
+ */
 proposal* readInProposals(int propList[][5], int numProposals, int label)
 {
 	proposal* objProposals = new proposal[numProposals];
@@ -86,4 +94,26 @@ proposal* readInProposals(int propList[][5], int numProposals, int label)
 
 	cout << "Returns new address" << endl;
 	return objProposals;
+}
+
+/**
+ * Calculates the Intersection over union of 2 bounding boxes
+ * @param  boxA first rectangle/bounding box
+ * @param  boxB second rectangle/bounding box
+ * @return      the IOU of both rectangles
+ */
+double calculateIOU(Rect boxA, Rect boxB)
+{
+	int x1 = boxA.x > boxB.x ? boxA.x: boxB.x;
+	int y1 = boxA.y > boxB.y ? boxA.y: boxB.y;
+	int x2 = boxA.x + boxA.width < boxB.x + boxB.width ? boxA.x + boxA.width: boxB.x + boxA.width;
+	int y2 = boxA.y + boxA.height < boxB.y + boxB.height  ? boxA.y + boxA.height: boxB.y + boxB.height ;
+
+	if (x1 > x2 || y1 > y2) {
+		return 0.0;
+	} else {
+		int interAB = (x2 - x1) * (y2 - y1);
+		int unionAB = boxA.width * boxA.height + boxB.width * boxB.height - interAB;
+		return (double) ((double) interAB) / ((double) unionAB);
+	}
 }
