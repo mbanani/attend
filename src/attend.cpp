@@ -116,6 +116,19 @@ int main( int argc, char* argv[])
     my_imshow("orientation",  oriSaliency, 500  , 50);
     my_imshow("output",  output, 50  , 50);
 
+    Rect a = Rect(100, 100, 100, 100);
+    Rect b = Rect(150, 150, 100, 100);
+    Rect c = Rect(50, 50, 100, 100);
+    Rect d = Rect(50, 100, 100, 100);
+    Rect e = Rect(200, 200, 100, 100);
+
+    cout << "Union aa " << calculateIOU(a,a) << endl;
+    cout << "Union ab " << calculateIOU(a,b) << endl;
+    cout << "Union ac " << calculateIOU(a,c) << endl;
+    cout << "Union ad " << calculateIOU(a,d) << endl;
+    cout << "Union ae " << calculateIOU(a,e) << endl;
+    cout << "Union bc " << calculateIOU(b,c) << endl;
+    cout << "Union de " << calculateIOU(d,e) << endl;
 
 
     waitKey(100000);
