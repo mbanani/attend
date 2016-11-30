@@ -59,9 +59,6 @@ int calculateSaliencyScore(Mat& saliencyMap, proposal prop)
  */
 void drawBB(Mat& image, proposal prop, Scalar color)
 {
-	cout << "drawBB Rect x " << prop.bbox.x << " , y " << prop.bbox.y << endl;
-	cout << "drawBB Rect w " << prop.bbox.width << " , h " << prop.bbox.height << endl;
-
 	rectangle(image, prop.bbox, color, 2);
 	std::ostringstream strs;
     strs << prop.saliencyScore;
@@ -81,18 +78,14 @@ proposal* readInProposals(int propList[][5], int numProposals, int label)
 {
 	proposal* objProposals = new proposal[numProposals];
 
-	cout << "Goes into Loop" << endl;
-
 	for(int i = 0; i < numProposals; i++)
 	{
 
 		objProposals[i].bbox = Rect(propList[i][0], propList[i][1], propList[i][2], propList[i][3]);
 		objProposals[i].confScore = propList[i][4];
 		objProposals[i].label = label;
-		cout << "Ends one loop run" << endl;
 	}
 
-	cout << "Returns new address" << endl;
 	return objProposals;
 }
 

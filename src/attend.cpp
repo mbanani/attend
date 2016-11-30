@@ -16,18 +16,21 @@
 * 		= Not sure about gabor filter parameters
 *
 *	- Normalziation is performed
-*		= Normalizes maps with (M - m)^2 [M is global maxima, and m is average of all maxima]
-*
+*		= Normalizes maps with (M - m)^2
+*		     * [M is global maxima, and m is mean of all maxima]
+*		= After normalization, conspicuity maps are multiplied by the learned
+*		  weights for the object being searched for.
 *
 *	** Points to note:
 *	- focus now on producing a prototype with very little regard for efficiency
 *	- try to modularize as much as possible to allow for simple enhancements
+*	- All the normalization makes it hard to compare across images; an object
+*	  with low saliency in a bland image with have the same saliency as a highly
+*	  salient object in a very exciting image.
 *
 * 	To do:
-* 		- consider
-*
+* 		- Consider memory allocation issues if this is to be implemented
 */
-
 
 #include "saliency.h"
 #include "normalize.h"
@@ -39,7 +42,6 @@ using namespace cv;
 
 
 Mat generateSaliency(Mat, float*, bool, bool);
-Mat generateRGBYSaliency(Mat, float*, bool);
 proposal topPropoal(Mat&, proposal*, int, float*, int);
 float* learnFeature(Mat&, proposal);
 
@@ -50,6 +52,8 @@ int main( int argc, char* argv[])
 
     Mat input = imread(argv[1], CV_LOAD_IMAGE_COLOR);
 
+
+    // adjust all images to a specified maximum width
     int width = 1000;
     float ratio = ( (float) input.rows / (float) input.cols);
     cout << "Rows " << input.rows << ". Cols " << input.cols << ". ratio " << ratio << endl;
@@ -58,93 +62,46 @@ int main( int argc, char* argv[])
     width = width > input.cols ? width: input.cols;
     height = height > input.rows ? height: input.rows;
 
-    // Display features
+    // Display image size
     int d_width = 500;
     int d_height = 500 * ratio;
 
-    // resize(input, input, Size(width,height));
-
+    // initialize proposal values
     proposal originalProp;
     originalProp.bbox = Rect(550, 250, 180, 150);
     originalProp.confScore = 10000;
+    int proposalList[3][5] = {{550, 250, 180, 150, 1000}, {610, 310, 50, 50, 1000}, {80, 250, 100, 150, 1000}};
+
+    // Learn saliency features from example
     float* features = learnFeature(input, originalProp);
     int thresh = 10000;  // 1000/10000
 
-    cout << "Learned features : " << features[0] << ", " << features[1] << ", " << features[2] << endl;
-
-    int proposalList[3][5] = {{550, 250, 180, 150, 1000}, {610, 310, 50, 50, 1000}, {80, 250, 100, 150, 1000}};
-
+    // read in proposals and generate top proposal
     proposal* objProps = readInProposals(proposalList, 3, 1);
     proposal topProp = topPropoal(input, objProps, 3, features, thresh);
 
-
+    // output results
     Mat output;
 
-
-    // resize(saliency, saliency, input.size());
     resize(input, output, input.size());
-
     drawBB(output, topProp, Scalar(0,0,255));
-    // drawBB(saliency, topProp, Scalar(0,0,255));
-    //
-    // drawBB(output, bbox2, confStr2, Scalar(0,0,255));
-    // drawBB(saliency, bbox2, confStr2, Scalar(0,0,255));
-    //
-    // drawBB(output, bbox3, confStr3, Scalar(0,0,255));
-    // drawBB(saliency, bbox3, confStr3, Scalar(0,0,255));
-
-    // resize(saliency, saliency, Size(d_width, d_height));
-
-
-
-    // my_imshow("saliency",  saliency, 100 + width  , 50);
-
-
-    // my_imshow("intensity",  saliency1, 50  , 50);
-    // my_imshow("orientation",  saliency2, 50 , 200 + d_height);
-    // my_imshow("color opponency",  saliency3, 100 + d_width  ,50);
-    // my_imshow("overall",saliency4, 100 + d_width, 200 + d_height);
-    // my_imshow("Original",input, 150 + 2*d_width , 50);
-    // my_imshow("Custom",saliency5, 150 + 2*d_width , 200 + d_height);
-
-    float oriFeat[3] = {0.0, 1.0, 0.0};
-    Mat oriSaliency = generateSaliency(input, oriFeat, false, false);
-
-    resize(oriSaliency, oriSaliency, input.size());
-    drawBB(oriSaliency, topProp, Scalar(0,0,255));
-    resize(output, output, input.size());
-    my_imshow("orientation",  oriSaliency, 500  , 50);
     my_imshow("output",  output, 50  , 50);
 
-    Rect a = Rect(100, 100, 100, 100);
-    Rect b = Rect(150, 150, 100, 100);
-    Rect c = Rect(50, 50, 100, 100);
-    Rect d = Rect(50, 100, 100, 100);
-    Rect e = Rect(200, 200, 100, 100);
-
-    cout << "Union aa " << calculateIOU(a,a) << endl;
-    cout << "Union ab " << calculateIOU(a,b) << endl;
-    cout << "Union ac " << calculateIOU(a,c) << endl;
-    cout << "Union ad " << calculateIOU(a,d) << endl;
-    cout << "Union ae " << calculateIOU(a,e) << endl;
-    cout << "Union bc " << calculateIOU(b,c) << endl;
-    cout << "Union de " << calculateIOU(d,e) << endl;
-
-
     waitKey(100000);
-
 }
 
 /**
  * Initial attempt at outputing normalized saliency maps
  *
  * @param  image          input image
- * @param  objectFeatures an array of floats determining the normalization weights
+ * @param  objectFeatures float-array determining the feature weights
+ * @param  avgGlobal      true if maps are average, false for winner-take-all
+ * @param  debug          if set to true, show images produced at each stage
  * @return                an object-specific saliency map
  */
 Mat generateSaliency(Mat input, float* objectFeatures, bool avgGlobal, bool debug)
 {
-
+    // get time (to be used for calculating time for saliency generation)
     double t = (double)getTickCount();
 
     Mat channels[5];
@@ -164,7 +121,7 @@ Mat generateSaliency(Mat input, float* objectFeatures, bool avgGlobal, bool debu
         waitKey(100000);
     }
 
-    // extract orientations
+    // Gabor Filter Parameters
     Mat or0, or45, or90, or135;
     Size kerSize = Size(10, 10);
     double sigma = 0.8;
@@ -172,12 +129,13 @@ Mat generateSaliency(Mat input, float* objectFeatures, bool avgGlobal, bool debu
     double gamma = 1;
     double psi   = CV_PI / 2;
 
-
+    // Generate Gabor kernels for the different orientations
     Mat kern0   = getGaborKernel(kerSize, sigma, 0         , lam, gamma, psi);
     Mat kern45  = getGaborKernel(kerSize, sigma, 0.25*CV_PI, lam, gamma, psi);
     Mat kern90  = getGaborKernel(kerSize, sigma, 0.5*CV_PI , lam, gamma, psi);
     Mat kern135 = getGaborKernel(kerSize, sigma, 0.75*CV_PI, lam, gamma, psi);
 
+    // Calculate orientation feature maps
     filter2D(channels[4], or0  , CV_32F, kern0);
     filter2D(channels[4], or45 , CV_32F, kern45);
     filter2D(channels[4], or90 , CV_32F, kern90);
@@ -194,7 +152,7 @@ Mat generateSaliency(Mat input, float* objectFeatures, bool avgGlobal, bool debu
         waitKey(100000);
     }
 
-    //define pyramid variables
+    // Define Pyramid variables
     Mat bluePyr[9];
     Mat greenPyr[9];
     Mat redPyr[9];
@@ -205,12 +163,13 @@ Mat generateSaliency(Mat input, float* objectFeatures, bool avgGlobal, bool debu
     Mat or90Pyr[9];
     Mat or135Pyr[9];
 
-    //Construct pyramids and (maybe release memory for channels)
+    //Construct pyramids
     construct_pyramid(channels[0], redPyr, 9);
     construct_pyramid(channels[1], greenPyr, 9);
     construct_pyramid(channels[2], bluePyr, 9);
     construct_pyramid(channels[3], yellowPyr, 9);
     construct_pyramid(channels[4], intensPyr, 9);
+
     //Missing orientation pyramids
     construct_pyramid(or0, or0Pyr, 9);
     construct_pyramid(or45, or45Pyr, 9);
@@ -218,140 +177,83 @@ Mat generateSaliency(Mat input, float* objectFeatures, bool avgGlobal, bool debu
     construct_pyramid(or135, or135Pyr, 9);
 
 
-    //(output stages)cout << "Calculating Across Scale Features. " << endl;
-    // define feature maps
-    Mat oppRG_fm[6];
-    Mat oppBY_fm[6];
-    Mat or0_fm[6];
-    Mat or45_fm[6];
-    Mat or90_fm[6];
-    Mat or135_fm[6];
-    Mat intens_fm[6];
+    // define conspicuity map pyramids
+    Mat oppRG_cm[6];
+    Mat oppBY_cm[6];
+    Mat or0_cm[6];
+    Mat or45_cm[6];
+    Mat or90_cm[6];
+    Mat or135_cm[6];
+    Mat intens_cm[6];
 
-    //calculate feature maps for within pyramid features
-    across_scale_diff(intensPyr, intens_fm);
-    across_scale_diff(or0Pyr, or0_fm);
-    across_scale_diff(or45Pyr, or45_fm);
-    across_scale_diff(or90Pyr, or90_fm);
-    across_scale_diff(or135Pyr, or135_fm);
-    across_scale_opponency_diff(redPyr, greenPyr, oppRG_fm);
-    across_scale_opponency_diff(bluePyr, yellowPyr, oppBY_fm);
+    //calculate conspituity map pyramids
+    across_scale_diff(intensPyr, intens_cm);
+    across_scale_diff(or0Pyr, or0_cm);
+    across_scale_diff(or45Pyr, or45_cm);
+    across_scale_diff(or90Pyr, or90_cm);
+    across_scale_diff(or135Pyr, or135_cm);
+    across_scale_opponency_diff(redPyr, greenPyr, oppRG_cm);
+    across_scale_opponency_diff(bluePyr, yellowPyr, oppBY_cm);
 
-    // Normalize and Integrate
-    normalize_pyramid(oppRG_fm, 6);
-    normalize_pyramid(oppBY_fm, 6);
-    normalize_pyramid(intens_fm, 6);
-    normalize_pyramid(or0_fm, 6);
-    normalize_pyramid(or45_fm, 6);
-    normalize_pyramid(or90_fm, 6);
-    normalize_pyramid(or135_fm, 6);
+    // Normalize
+    normalize_pyramid(oppRG_cm, 6);
+    normalize_pyramid(oppBY_cm, 6);
+    normalize_pyramid(intens_cm, 6);
+    normalize_pyramid(or0_cm, 6);
+    normalize_pyramid(or45_cm, 6);
+    normalize_pyramid(or90_cm, 6);
+    normalize_pyramid(or135_cm, 6);
 
 
     // debug show levels
     if (debug)
     {
-        debug_show_imgPyramid(oppRG_fm, "RG Opponency");
-        debug_show_imgPyramid(oppBY_fm, "BY Opponency");
-        debug_show_imgPyramid(intens_fm, "Intensity");
-        debug_show_imgPyramid(or0_fm,   "Orientation 0");
-        debug_show_imgPyramid(or45_fm,  "Orientation 45");
-        debug_show_imgPyramid(or90_fm,  "Orientation 90");
-        debug_show_imgPyramid(or135_fm, "Orientation 135");
+        debug_show_imgPyramid(oppRG_cm, "RG Opponency");
+        debug_show_imgPyramid(oppBY_cm, "BY Opponency");
+        debug_show_imgPyramid(intens_cm, "Intensity");
+        debug_show_imgPyramid(or0_cm,   "Orientation 0");
+        debug_show_imgPyramid(or45_cm,  "Orientation 45");
+        debug_show_imgPyramid(or90_cm,  "Orientation 90");
+        debug_show_imgPyramid(or135_cm, "Orientation 135");
     }
 
-    //define overall feature mpas
-    Mat intens_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
-    Mat opp_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
-    Mat ori_FM(oppRG_fm[0].rows, oppRG_fm[0].cols, CV_32F, Scalar(0.0));
+    //define overall conspicuity maps (initialized size is the same for all)
+    Mat intens_CM(oppRG_cm[0].rows, oppRG_cm[0].cols, CV_32F, Scalar(0.0));
+    Mat opp_CM(oppRG_cm[0].rows, oppRG_cm[0].cols, CV_32F, Scalar(0.0));
+    Mat ori_CM(oppRG_cm[0].rows, oppRG_cm[0].cols, CV_32F, Scalar(0.0));
 
-    //(output stages)cout << "Integrating Features" << endl;
-    //integrate feature maps for intenisty and color
-    integrate_single_pyramid(intens_fm, intens_FM, 6);
-    integrate_color_pyamids(oppBY_fm, oppRG_fm, opp_FM, 6);
-    integrate_orient_pyamids(or0_fm, or45_fm,or90_fm, or135_fm, ori_FM, 6);
+    //integrate conspicuity maps
+    integrate_single_pyramid(intens_cm, intens_CM, 6);
+    integrate_color_pyamids(oppBY_cm, oppRG_cm, opp_CM, 6);
+    integrate_orient_pyamids(or0_cm, or45_cm, or90_cm, or135_cm, ori_CM, 6);
 
-    normalize(intens_FM);
-    normalize(ori_FM);
-    normalize(opp_FM);
+    // normalize again ?!
+    normalize(intens_CM);
+    normalize(ori_CM);
+    normalize(opp_CM);
 
-    // normalize(intens_FM,    intens_FM,  0.0, objectFeatures[0], NORM_MINMAX, CV_32F);
-    // normalize(ori_FM,       ori_FM,     0.0, objectFeatures[1], NORM_MINMAX, CV_32F);
-    // normalize(opp_FM,       opp_FM,     0.0, objectFeatures[2], NORM_MINMAX, CV_32F);
-
-    intens_FM = intens_FM * objectFeatures[0];
-    ori_FM = ori_FM * objectFeatures[1];
-    opp_FM = opp_FM * objectFeatures[2];
+    // Multiply by feature weights
+    intens_CM = intens_CM * objectFeatures[0];
+    ori_CM = ori_CM * objectFeatures[1];
+    opp_CM = opp_CM * objectFeatures[2];
 
     //integrate all maps
-    Mat global_FM;
+    Mat global_CM;
 
     if(avgGlobal){
-        global_FM = opp_FM + intens_FM + ori_FM;
+        global_CM = opp_CM + intens_CM + ori_CM;
     } else {
-        max(ori_FM, intens_FM, global_FM);
-        max(global_FM, opp_FM, global_FM);
+        max(ori_CM, intens_CM, global_CM);
+        max(global_CM, opp_CM, global_CM);
     }
 
-    normalize(global_FM, global_FM, 0.0, 1.0, NORM_MINMAX, CV_32F);
+    // Normalize final output ?
+    normalize(global_CM, global_CM, 0.0, 1.0, NORM_MINMAX, CV_32F);
 
     t = ((double)getTickCount() - t)/getTickFrequency();
     cout << "Total so far (without read and write) in seconds: " << t << endl;
 
-    return global_FM;
-}
-
-/**
- * Initial attempt at outputing normalized saliency maps
- *
- * @param  input    input image
- * @param  rgby     an array of floats determining the color value
- * @return          a color-specific saliency map
- */
-Mat generateRGBYSaliency(Mat input, float* rgbyCoeff, bool avgGlobal)
-{
-
-    double t = (double)getTickCount();
-
-    Mat channels[5];
-
-    //extract colors and intensity.
-    //Channels in order: Red, Green, Blue, Yellow
-    split_rgbyi(input, channels);
-
-    Mat newColor = rgbyCoeff[0] * channels[0] + rgbyCoeff[1] * channels[1];
-    newColor = newColor + rgbyCoeff[2] * channels[2] +rgbyCoeff[3] * channels[3];
-
-    //define pyramid variables
-    Mat colorPyr[9];
-
-    //Construct pyramids and (maybe release memory for channels)
-    construct_pyramid(newColor, colorPyr, 9);
-
-    //(output stages)cout << "Calculating Across Scale Features. " << endl;
-    // define feature maps
-    Mat color_fm[6];
-
-    //calculate feature maps for within pyramid features
-    across_scale_diff(colorPyr, color_fm);
-
-    // Normalize and Integrate
-    normalize_pyramid(color_fm, 6);
-
-    //define overall feature mpas
-    Mat color_FM(color_fm[0].rows, color_fm[0].cols, CV_32F, Scalar(0.0));
-
-    //(output stages)cout << "Integrating Features" << endl;
-    //integrate feature maps for intenisty and color
-    integrate_single_pyramid(color_fm, color_FM, 6);
-
-    normalize(color_FM);
-
-    normalize(color_FM,  color_FM,   0.0, 1.0, NORM_MINMAX, CV_32F);
-
-    t = ((double)getTickCount() - t)/getTickFrequency();
-    cout << "Total so far (without read and write) in seconds: " << t << endl;
-
-    return color_FM;
+    return global_CM;
 }
 
 /**
@@ -364,10 +266,10 @@ Mat generateRGBYSaliency(Mat input, float* rgbyCoeff, bool avgGlobal)
 proposal topPropoal(Mat& image, proposal* objProps, int numProposals, float* features, int thresh)
 {
 	proposal topProp;
-    Mat saliencyMap = generateSaliency(image, features, false, false);
+    Mat saliencyMap = generateSaliency(image, features, true, false);
     resize(saliencyMap, saliencyMap, image.size());
 
-
+    // // Display the saliency map
     // my_imshow("output",  saliencyMap, 50  , 50);
     // waitKey(100000);
 
@@ -392,32 +294,37 @@ float* learnFeature(Mat& image, proposal prop)
 {
     float* score = new float[3];
 
+    // initialize feature vectors for each feature
     float features0[3] = {1.0, 0.0, 0.0};
     float features1[3] = {0.0, 1.0, 0.0};
     float features2[3] = {0.0, 0.0, 1.0};
 
+    //generate saliency map for each object
     Mat saliency0 = generateSaliency(image, features0, false, false);
     Mat saliency1 = generateSaliency(image, features1, false, false);
     Mat saliency2 = generateSaliency(image, features2, false, false);
 
+    // resize image to fit it
+    // (consider resizing box instead, as loss in accuracy should be negligable)
     resize(saliency0, saliency0, image.size());
     resize(saliency1, saliency1, image.size());
     resize(saliency2, saliency2, image.size());
 
+    // Score calculated from the same Saliency evaluation function
     score[0] = (float) calculateSaliencyScore(saliency0, prop);
     score[1] = (float) calculateSaliencyScore(saliency1, prop);
     score[2] = (float) calculateSaliencyScore(saliency2, prop);
 
+    // Normalize score vector
     float sum = score[0] + score[1] + score[2];
     score[0] = score[0] / sum;
     score[1] = score[1] / sum;
     score[2] = score[2] / sum;
 
-    cout << "score for 0: " << calculateSaliencyScore(saliency0, prop) << endl;
-    cout << "score for 1: " << calculateSaliencyScore(saliency1, prop) << endl;
-    cout << "score for 2: " << calculateSaliencyScore(saliency2, prop) << endl;
-
-    cout << "sum: " << sum << endl;
-
+    // cout << "score for 0: " << calculateSaliencyScore(saliency0, prop) << endl;
+    // cout << "score for 1: " << calculateSaliencyScore(saliency1, prop) << endl;
+    // cout << "score for 2: " << calculateSaliencyScore(saliency2, prop) << endl;
+    //
+    // cout << "sum: " << sum << endl;
     return score;
 }
