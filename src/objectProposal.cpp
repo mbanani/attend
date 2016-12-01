@@ -65,6 +65,37 @@ void drawBB(Mat& image, proposal prop, Scalar color)
 	putText(image, strs.str(), Point(prop.bbox.x, prop.bbox.y), FONT_HERSHEY_SIMPLEX, 1, color, 2);
 }
 
+void csvToProposalList(const char* fileName, int propList[NUM_PROPOSALS][5])
+{
+	fstream fin; //( "report1.txt" );
+    fin.open( fileName );
+    string descriptions, nextline, element;
+	int i_prop = 0;
+	char delim = ',';
+
+    while( getline( fin, nextline) && i_prop < NUM_PROPOSALS ) {
+		stringstream line( nextline );
+		getline(line, element, delim);
+		propList[i_prop][0] = atoi(element.c_str());
+
+		getline(line, element, delim);
+		propList[i_prop][1] = atoi(element.c_str());
+
+		getline(line, element, delim);
+		propList[i_prop][2] = atoi(element.c_str());
+
+		getline(line, element, delim);
+		propList[i_prop][3] = atoi(element.c_str());
+
+
+		getline(line, element, delim);
+		propList[i_prop][4] = 10000 * atof(element.c_str());
+
+		i_prop = i_prop + 1;
+	}
+}
+
+
 /**
  * Reads in n proposals from an nx5 in array.
  * Each row has (x,y,w,h, confScore*10000)
@@ -74,7 +105,7 @@ void drawBB(Mat& image, proposal prop, Scalar color)
  * @param  label        The label associated with those proposals ?
  * @return              Returns an array of proposals
  */
-proposal* readInProposals(int propList[][5], int numProposals, int label)
+proposal* arrayToProposals(int propList[][5], int numProposals, int label)
 {
 	proposal* objProposals = new proposal[numProposals];
 

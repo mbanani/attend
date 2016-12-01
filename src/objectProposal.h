@@ -12,9 +12,12 @@
  #include <cmath>
  #include <typeinfo>
  #include <iostream>
+ #include <sstream>
+ #include <fstream>
+ #include <string>
  #include <cstdio>
 
-
+const int NUM_PROPOSALS = 40;
 /**
  * A structure for object proposals.
  * 	bbox            rectangle object that covers the object proposal.
@@ -34,5 +37,6 @@
 int calculateSaliencyScore(cv::Mat&, proposal);
 void drawBB(cv::Mat&, proposal, cv::Scalar);
 // void drawBB(cv::Mat&, cv::Rect, const std::string&, cv::Scalar);
-proposal* readInProposals(int[][5], int, int);
+proposal* arrayToProposals(int[][5], int, int);
 double  calculateIOU(cv::Rect, cv::Rect);
+void csvToProposalList(const char*, int[NUM_PROPOSALS][5]);
