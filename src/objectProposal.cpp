@@ -45,7 +45,8 @@ int calculateSaliencyScore(Mat& saliencyMap, proposal prop)
 	Scalar surrVal = sum(saliencyMap(Rect(x1, y1, x2-x1, y2-y1))) - sumVal;
 
 	double factor = ((double)((y2-y1) * (x2-x1)) / (double) (bbox.width * bbox.height)) - 1;
-	int score = prop.confScore * ((double) (sumVal[0] - (surrVal[0]/factor)))/((double) bbox.width * bbox.height);
+	// int score = prop.confScore * ((double) (sumVal[0] - (surrVal[0]/factor)))/((double) bbox.width * bbox.height);
+	int score = ((double) (sumVal[0] - (surrVal[0]/factor)))/((double) bbox.width * bbox.height);
 	return score;
 
 }
