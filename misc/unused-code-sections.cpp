@@ -117,3 +117,42 @@ void split_input_to_visible(Mat& input, Mat* channels)
 
         return color_FM;
     }
+
+    //
+    // float* learnFeatureProto(Mat& image)
+    // {
+    //
+    //     int numFeatures = 11;
+    //
+    //     float* score = new float[numFeatures];
+    //     float sum = 0;
+    //
+    //     for(int i = 0; i < numFeatures; i++)
+    //     {
+    //         // initialize feature vectore for each feature
+    //         float features[11] = {0};
+    //         features[i] = 1.0;
+    //
+    //         //generate saliency map for each feature
+    //         Mat saliency = generateSaliency(image, features, true, false);
+    //
+    //         // resize image to fit it
+    //         // (consider resizing box instead, as loss in accuracy should be negligable)
+    //         resize(saliency, saliency, image.size());
+    //
+    //         score[i] = (float) calculateSaliencyScoreProto(saliency);
+    //         sum = sum + score[i];
+    //     }
+    //
+    //     for(int i = 0; i < numFeatures; i++)
+    //     {
+    //         score[i] = score[i] / sum;
+    //     }
+    //
+    //     // cout << "score for 0: " << calculateSaliencyScore(saliency0, prop) << endl;
+    //     // cout << "score for 1: " << calculateSaliencyScore(saliency1, prop) << endl;
+    //     // cout << "score for 2: " << calculateSaliencyScore(saliency2, prop) << endl;
+    //     //
+    //     // cout << "sum: " << sum << endl;
+    //     return score;
+    // }
