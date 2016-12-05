@@ -17,7 +17,7 @@
  #include <string>
  #include <cstdio>
 
-const int NUM_PROPOSALS = 10;
+const int NUM_PROPOSALS = 10000;
 /**
  * A structure for object proposals.
  * 	bbox            rectangle object that covers the object proposal.
@@ -37,6 +37,7 @@ const int NUM_PROPOSALS = 10;
 int calculateSaliencyScore(cv::Mat&, proposal);
 int calculateSaliencyScoreProto(cv::Mat&);
 void drawBB(cv::Mat&, proposal, cv::Scalar);
+void drawBB(cv::Mat&, cv::Rect, cv::Scalar);
 // void drawBB(cv::Mat&, cv::Rect, const std::string&, cv::Scalar);
 proposal* arrayToProposals(int[][5], int, int);
 double  calculateIOU(cv::Rect, cv::Rect);

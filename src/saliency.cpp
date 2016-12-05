@@ -48,7 +48,7 @@ void split_rgbyi(Mat& input, Mat* channels)
         for ( y = 0; y < nCols; ++y)
         {
             //calculate initial intensity to make sure it's non-zero
-            i = ((in_p[y])[0] + (in_p[y])[1] + (in_p[y])[2])/(3);
+            i = ((in_p[y])[0] + (in_p[y])[1] + (in_p[y])[2]);
 
             if (i > 0)
             {
@@ -71,7 +71,7 @@ void split_rgbyi(Mat& input, Mat* channels)
                 // i_p[y] = (b_p[y]+r_p[y]+g_p[y])/3;
                 // i_p[y] = (0.7*b_p[y]+ 0.2*r_p[y]+ 0.8*g_p[y])/3;
                 // i_p[y] = (b_p[y]+r_p[y]+g_p[y] + y_p[y])/4;
-                i_p[y] = i;
+                i_p[y] = i/3;
 
             } else {
                 b_p[y] = 0;

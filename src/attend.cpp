@@ -49,25 +49,32 @@ float* learnFeature(Mat&, proposal);
 float* learnFeatureProto(Mat&, proposal);
 float* learnFeaturefromDataset(const char *, int);
 float* calculateSaliencyFeaturesProto(Mat& );
+void printFeatureValues(float* );
 
 
 int main( int argc, char* argv[])
 {
 
-    string picture = argv[1];
     double t = (double)getTickCount();
-    float* features = learnFeaturefromDataset("/home/mohamed/attend/img/4Progress_dataset/01bottle/image/positive", 11);
 
+    // Path parameters;
+    string object = argv[1];
+    string picture = argv[2];
+    string folderPath = "/home/mohamed/attend/img/4Progress_dataset/" + object;
+    string CSVpath = folderPath + "/bboxes/" + picture + ".csv";
+    string IMGpath = folderPath + "/image/" + picture + ".jpg";
+    string trainPath = folderPath + "/image/positive";
+
+    // Learn features from training set;
+    float* features = learnFeaturefromDataset(trainPath.c_str() , 11);
 
     t = ((double)getTickCount() - t);
     cout << "Time to learn features in seconds: " << t/getTickFrequency() << endl;
 
     int propList[NUM_PROPOSALS][5] = {0};
 
-    string CSVpath = "/home/mohamed/attend/img/4Progress_dataset/01bottle/bboxes/" + picture + ".csv";
     csvToProposalList(CSVpath.c_str(), propList);
 
-    string IMGpath = "/home/mohamed/attend/img/4Progress_dataset/01bottle/image/" + picture + ".jpg";
     Mat input = imread(IMGpath.c_str(), CV_LOAD_IMAGE_COLOR);
 
     proposal* objProps = arrayToProposals(propList, NUM_PROPOSALS, 1);
@@ -84,61 +91,25 @@ int main( int argc, char* argv[])
 
     resize(input, output, input.size());
     drawBB(output, topProp, Scalar(0,0,255));
+    drawBB(output, Rect(470,90,240,340), Scalar(255,0,0));
     my_imshow("output",  output, 50  , 50);
     cout << "Top Proposal: " << topProp.bbox.x << ", " << topProp.bbox.y <<", " << topProp.bbox.width <<", " << topProp.bbox.height << endl;
 
-    for(int i = 0; i < 10; i++)
+
+    for(int i = 0; i < 100; i++)
     {
-        drawBB(output, objProps[i], Scalar(0,255,0));
+        if (calculateIOU(objProps[i].bbox, Rect(470,90,240, 340)) > 0.8)
+        {
+            drawBB(output, objProps[i], Scalar(255,0,0 ));
+
+        } else {
+            drawBB(output, objProps[i], Scalar(0,255,0));
+
+        }
     }
     my_imshow("output with all",  output, 550  , 50);
 
     cout << "Saliency calculations in seconds: " << t/getTickFrequency() << endl;
-    // for(int i = 0; i < NUM_PROPOSALS; i++)
-    // {
-    //     cout << i << ": \t";
-    //     for(int j = 0; j < 5; j++)
-    //     {
-    //         cout << propList[i][j] << ", ";
-    //     }
-    //     cout << endl;
-    // }
-    // Mat input = imread(argv[1], CV_LOAD_IMAGE_COLOR);
-    //
-    //
-    // // adjust all images to a specified maximum width
-    // int width = 1000;
-    // float ratio = ( (float) input.rows / (float) input.cols);
-    // cout << "Rows " << input.rows << ". Cols " << input.cols << ". ratio " << ratio << endl;
-    // int height = ratio * width;
-    //
-    // width = width > input.cols ? width: input.cols;
-    // height = height > input.rows ? height: input.rows;
-    //
-    // // Display image size
-    // int d_width = 500;
-    // int d_height = 500 * ratio;
-    //
-    // // initialize proposal values
-    // proposal originalProp;
-    // originalProp.bbox = Rect(550, 250, 180, 150);
-    // originalProp.confScore = 10000;
-    // int proposalList[3][5] = {{550, 250, 180, 150, 1000}, {610, 310, 50, 50, 1000}, {80, 250, 100, 150, 1000}};
-    //
-    // // Learn saliency features from example
-    // float* features = learnFeature(input, originalProp);
-    // int thresh = 10000;  // 1000/10000
-    //
-    // // read in proposals and generate top proposal
-    // proposal* objProps = arrayToProposals(proposalList, 3, 1);
-    // proposal topProp = topPropoal(input, objProps, 3, features, thresh);
-    //
-    // // output results
-    // Mat output;
-    //
-    // resize(input, output, input.size());
-    // drawBB(output, topProp, Scalar(0,0,255));
-    // my_imshow("output",  output, 50  , 50);
 
     waitKey(100000);
 }
@@ -322,6 +293,7 @@ Mat generateSaliencyProto(Mat input, float* objectFeatures, bool avgGlobal, bool
 
     if (debug)
     {
+        cout << "Debug generateSaliencyProto 1: show raw channels" << endl;
         my_imshow("input    ",  input      , 50  , 50);
         my_imshow("Red",        channels[0], 50  , 400);
         my_imshow("Green",      channels[1], 600 , 50);
@@ -353,6 +325,7 @@ Mat generateSaliencyProto(Mat input, float* objectFeatures, bool avgGlobal, bool
 
     if (debug)
     {
+        cout << "Debug generateSaliencyProto 1: show orientation channels" << endl;
         my_imshow("input    ", input       , 50  , 50);
         my_imshow("Intensity", channels[4] , 50  , 400);
         my_imshow("Channel 1", or0         , 600 , 50);
@@ -417,6 +390,7 @@ Mat generateSaliencyProto(Mat input, float* objectFeatures, bool avgGlobal, bool
     // debug show levels
     if (debug)
     {
+        cout << "Debug generateSaliencyProto 1: show conspicuity channels" << endl;
         debug_show_imgPyramid(oppRG_cm, "RG Opponency");
         debug_show_imgPyramid(oppBY_cm, "BY Opponency");
         debug_show_imgPyramid(intens_cm, "Intensity");
@@ -441,18 +415,18 @@ Mat generateSaliencyProto(Mat input, float* objectFeatures, bool avgGlobal, bool
     normalize(ori_CM);
     normalize(opp_CM);
 
+    //normalize all feature maps .. hues are already normalized, normalize orientation
+    normalize(or0);
+    normalize(or45);
+    normalize(or90);
+    normalize(or135);
+
     //resize all maps
     resize(intens_CM, intens_CM, input.size());
     resize(ori_CM, ori_CM, input.size());
     resize(opp_CM, opp_CM, input.size());
 
-    cout << "-----" << endl;
-    for(int i = 0; i < 11; i++)
-    {
-        cout << "feature " << i << " is "<< objectFeatures[i] << endl;
-
-    }
-    cout << "-----" << endl;
+    printFeatureValues(objectFeatures);
 
     // Multiply by feature weights
     intens_CM = intens_CM * objectFeatures[0];
@@ -503,13 +477,15 @@ proposal topPropoal(Mat& image, proposal* objProps, int numProposals, float* fea
     Mat saliencyMap = generateSaliencyProto(image, features, true, false);
     resize(saliencyMap, saliencyMap, image.size());
 
-    // // Display the saliency map
-    // my_imshow("output",  saliencyMap, 50  , 50);
-    // waitKey(100000);
+    // Display the saliency map
+    my_imshow("output",  saliencyMap, 50  , 50);
+    waitKey(100000);
+
 
     objProps[0].saliencyScore = calculateSaliencyScore(saliencyMap, objProps[0]);
     topProp = objProps[0];
 
+    cout << "calculated score" << endl;
 	for(int i = 1; i < numProposals; i++)
 	{
         objProps[i].saliencyScore = calculateSaliencyScore(saliencyMap, objProps[i]);
@@ -562,51 +538,18 @@ float* learnFeature(Mat& image, proposal prop)
     // cout << "sum: " << sum << endl;
     return score;
 }
-//
-// float* learnFeatureProto(Mat& image)
-// {
-//
-//     int numFeatures = 11;
-//
-//     float* score = new float[numFeatures];
-//     float sum = 0;
-//
-//     for(int i = 0; i < numFeatures; i++)
-//     {
-//         // initialize feature vectore for each feature
-//         float features[11] = {0};
-//         features[i] = 1.0;
-//
-//         //generate saliency map for each feature
-//         Mat saliency = generateSaliency(image, features, true, false);
-//
-//         // resize image to fit it
-//         // (consider resizing box instead, as loss in accuracy should be negligable)
-//         resize(saliency, saliency, image.size());
-//
-//         score[i] = (float) calculateSaliencyScoreProto(saliency);
-//         sum = sum + score[i];
-//     }
-//
-//     for(int i = 0; i < numFeatures; i++)
-//     {
-//         score[i] = score[i] / sum;
-//     }
-//
-//     // cout << "score for 0: " << calculateSaliencyScore(saliency0, prop) << endl;
-//     // cout << "score for 1: " << calculateSaliencyScore(saliency1, prop) << endl;
-//     // cout << "score for 2: " << calculateSaliencyScore(saliency2, prop) << endl;
-//     //
-//     // cout << "sum: " << sum << endl;
-//     return score;
-// }
 
 float* learnFeaturefromDataset(const char *databasePath, int numFeatures)
 {
-    float* featureSums = new float[11];
+    float* featureSums = new float[numFeatures];
     int numExamples = 0;
     string imgName, imgPath;
-    int maxExamples = 100;
+    int maxExamples = 1000;
+
+    for(int i = 0; i < numFeatures; i++)
+    {
+        featureSums[i] = 0;
+    }
 
     DIR *dir;
     struct dirent *ent;
@@ -629,22 +572,6 @@ float* learnFeaturefromDataset(const char *databasePath, int numFeatures)
                 featureSums[i] = featureSums[i] + instanceFeatures[i];
             }
 
-            // cout << "-----" << endl;
-            // for(int k = 0; k < 11; k++)
-            // {
-            //     cout << "feature instance       " << k << " is "<< instanceFeatures[k] << endl;
-            //
-            // }
-            // cout << "-----" << endl;
-            //
-            // for(int j = 0; j < 11; j++)
-            // {
-            //     cout << "feature SUM            " << j << " is "<< featureSums[j] << endl;
-            //
-            // }
-            // cout << "+++++++++++++++++++++++++++++++++++++++++" << endl;
-            // cout << "+++++++++++++++++++++++++++++++++++++++++" << endl;
-            // waitKey(1000);
         }
       }
       closedir (dir);
@@ -653,9 +580,8 @@ float* learnFeaturefromDataset(const char *databasePath, int numFeatures)
       {
           for(int i = 0; i < numFeatures; i++)
           {
-              cout << "feature SUM before     " << i << " is "<< featureSums[i] << endl;
               featureSums[i] = featureSums[i] / numExamples;
-              cout << "feature SUM            " << i << " is "<< featureSums[i] << endl;
+              cout << i << ":\t" << featureSums[i] << endl;
           }
       } else
       {
@@ -672,7 +598,6 @@ float* learnFeaturefromDataset(const char *databasePath, int numFeatures)
 
     return featureSums;
 }
-
 
 
 float* calculateSaliencyFeaturesProto(Mat& input)
@@ -782,47 +707,44 @@ float* calculateSaliencyFeaturesProto(Mat& input)
     // Multiply by feature weights
     Scalar features[11];
     float* featureVec = new float[11];
-    float sumFeat1;
-    float sumFeat2;
-    float sumFeat3;
     //
     // my_imshow("intenseCM", intens_CM, 50, 50);
     //
     // cout << "sum vale "<< sum(intens_CM) << endl;
     // waitKey(10000);
 
-    features[0] = sum(intens_CM);
-    features[1] = sum(ori_CM);
-    features[2] = sum(opp_CM);
-    features[4] = sum(channels[0]);
-    features[5] = sum(channels[1]);
-    features[5] = sum(channels[2]);
-    features[6] = sum(channels[3]);
-    features[7] = sum(or0);
-    features[8] = sum(or45);
-    features[9] = sum(or90);
-    features[10] = sum(or135);
+    features[0] = mean(intens_CM);
+    features[1] = mean(ori_CM);
+    features[2] = mean(opp_CM);
+    features[3] = mean(channels[0]);
+    features[4] = mean(channels[1]);
+    features[5] = mean(channels[2]);
+    features[6] = mean(channels[3]);
+    features[7] = mean(or0);
+    features[8] = mean(or45);
+    features[9] = mean(or90);
+    features[10] = mean(or135);
 
-    // for(int i = 0; i < 11; i++)
-    // {
-    //
-    //     featureVec[i] = (float) (features[i])[0];
-    //     cout << "feature vec    "<< featureVec[i] << endl;
-    //     cout << "features       "<< features[i] << endl;
-    //     cout << "features       "<< features[i] << endl;
-    //     cout << "--------" << endl;
-    // }
+    for(int i = 0; i < 11; i++)
+    {
+
+        featureVec[i] = (float) (features[i])[0];
+        // cout << "feature " << i << ": "<< featureVec[i] << endl;
+        // cout << "features       "<< features[i] << endl;
+        // cout << "features       "<< features[i] << endl;
+    }
+    // cout << "--------" << endl;
     // waitKey(100000);
 
-    sumFeat1 = featureVec[0] + featureVec[1] + featureVec[2];
-    sumFeat2 = featureVec[3] + featureVec[4] + featureVec[5] + featureVec[6];
-    sumFeat3 = featureVec[7] + featureVec[8] + featureVec[9] + featureVec[10];
+    float sumFeat1,sumFeat2,sumFeat3,featParity1;
+    sumFeat1 = abs(featureVec[0]) + abs(featureVec[1]) + abs(featureVec[2]);
+    sumFeat2 = abs(featureVec[3]) + abs(featureVec[4]) + abs(featureVec[5]) + abs(featureVec[6]);
+    sumFeat3 = abs(featureVec[7]) + abs(featureVec[8]) + abs(featureVec[9]) + abs(featureVec[10]);
 
     if(sumFeat1 != 0){
         featureVec[0] = featureVec[0]/sumFeat1;
         featureVec[1] = featureVec[1]/sumFeat1;
         featureVec[2] = featureVec[2]/sumFeat1;
-
     }
 
     if(sumFeat2 != 0){
@@ -845,4 +767,20 @@ float* calculateSaliencyFeaturesProto(Mat& input)
 
     return featureVec;
 
+}
+
+void printFeatureValues(float* features)
+{
+    cout << endl << "Saliency Feature Values: " << endl;
+    cout << "Intensity conspicuity :    \t"    <<  features[0] << endl;
+    cout << "Orientation conspicuity :  \t"    <<  features[1] << endl;
+    cout << "Opponency conspicuity :    \t"    <<  features[2] << endl;
+    cout << "Red Filter :               \t"    <<  features[3] << endl;
+    cout << "Green Filter :             \t"    <<  features[4] << endl;
+    cout << "Blue Filter :              \t"    <<  features[5] << endl;
+    cout << "Yellow Filter :            \t"    <<  features[6] << endl;
+    cout << "0-degree orientation :     \t"    <<  features[7] << endl;
+    cout << "45-degree orientation :    \t"    <<  features[8] << endl;
+    cout << "90-degree orientation :    \t"    <<  features[9] << endl;
+    cout << "135-degree orientation :   \t"    <<  features[10] << endl;
 }

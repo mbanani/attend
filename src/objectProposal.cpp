@@ -26,6 +26,7 @@ using namespace cv;
 int calculateSaliencyScore(Mat& saliencyMap, proposal prop)
 {
 	Rect bbox = prop.bbox;
+	
 	// cout << "Rect x " << bbox.x << " , y " << bbox.y << endl;
 	// cout << "Rect w " << bbox.width << " , h " << bbox.height << endl;
 
@@ -46,7 +47,7 @@ int calculateSaliencyScore(Mat& saliencyMap, proposal prop)
 
 	double factor = ((double)((y2-y1) * (x2-x1)) / (double) (bbox.width * bbox.height)) - 1;
 	// int score = prop.confScore * ((double) (sumVal[0] - (surrVal[0]/factor)))/((double) bbox.width * bbox.height);
-	int score = ((double) (sumVal[0] - (surrVal[0]/factor)))/((double) bbox.width * bbox.height);
+	int score = 10000 * ((double) (sumVal[0] - (surrVal[0]/factor)))/((double) bbox.width * bbox.height);
 	return score;
 
 }
@@ -58,13 +59,20 @@ int calculateSaliencyScore(Mat& saliencyMap, proposal prop)
  * @param  text  Text to be displayed next to bounding box
  * @param  color Color of box
  */
-void drawBB(Mat& image, proposal prop, Scalar color)
-{
-	rectangle(image, prop.bbox, color, 2);
-	std::ostringstream strs;
-    strs << prop.saliencyScore;
-	putText(image, strs.str(), Point(prop.bbox.x, prop.bbox.y), FONT_HERSHEY_SIMPLEX, 1, color, 2);
-}
+ void drawBB(Mat& image, proposal prop, Scalar color)
+ {
+ 	rectangle(image, prop.bbox, color, 2);
+ 	std::ostringstream strs;
+     strs << prop.saliencyScore;
+ 	putText(image, strs.str(), Point(prop.bbox.x, prop.bbox.y), FONT_HERSHEY_SIMPLEX, 1, color, 2);
+ }
+ void drawBB(Mat& image, Rect bbox, Scalar color)
+ {
+ 	rectangle(image, bbox, color, 2);
+ 	std::ostringstream strs;
+    //  strs << prop.saliencyScore;
+ 	putText(image, strs.str(), Point(bbox.x, bbox.y), FONT_HERSHEY_SIMPLEX, 1, color, 2);
+ }
 
 void csvToProposalList(const char* fileName, int propList[NUM_PROPOSALS][5])
 {
@@ -131,8 +139,12 @@ double calculateIOU(Rect boxA, Rect boxB)
 {
 	int x1 = boxA.x > boxB.x ? boxA.x: boxB.x;
 	int y1 = boxA.y > boxB.y ? boxA.y: boxB.y;
-	int x2 = boxA.x + boxA.width < boxB.x + boxB.width ? boxA.x + boxA.width: boxB.x + boxA.width;
-	int y2 = boxA.y + boxA.height < boxB.y + boxB.height  ? boxA.y + boxA.height: boxB.y + boxB.height ;
+	int x2A = boxA.x + boxA.width;
+	int x2B = boxB.x + boxB.width;
+	int y2A = boxA.y + boxA.height;
+	int y2B = boxB.y + boxB.height;
+	int x2 = x2A < x2B ? x2A: x2B;
+	int y2 = y2A < y2B ? y2A: y2B;
 
 	if (x1 > x2 || y1 > y2) {
 		return 0.0;
