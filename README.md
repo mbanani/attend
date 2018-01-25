@@ -2,10 +2,11 @@
 A top-down visual attentional model for the Soar cognitive architecture [1]. Model integrates an adapted openCV implementation of the bottom-up visual saliency model in [2] with parametrized normalization for integrating an agent's top-down knowledge to create object specific saliency maps. The implemetation is inteded to be used as a ranking metric for object proposals to improve visual detection and identification. edgeBox [3] will be used for object proposal generation. 
 
 Current Features used:
-	* Color
-	* Color Opponency
-	* Orientation
-	* Intensity
+
+* Color
+* Color Opponency
+* Orientation
+* Intensity
 
 [1] Laird, John E. The Soar cognitive architecture. MIT Press, 2012.
 
